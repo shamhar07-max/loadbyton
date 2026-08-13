@@ -54,7 +54,7 @@ export default function Earnings() {
         <Stat label="Paid out" value={formatAED(totals.paid)} tone="accent" />
         <Stat label="Pending" value={formatAED(totals.pending)} />
         <Stat label="This month" value={formatAED(Math.round(pending * 0.3))} />
-        <Stat label="Avg per job" value={totals.paid > 0 ? formatAED(Math.round(totals.paid / (payouts.length || 1)))} />
+        <Stat label="Avg per job" value={totals.paid > 0 ? formatAED(Math.round(totals.paid / (payouts.length || 1))) : '—'} />
       </div>
 
       <div className="mt-6">
