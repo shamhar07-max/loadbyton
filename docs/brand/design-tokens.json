@@ -1,0 +1,86 @@
+{
+  "$schema": "loadbyton/design-tokens/v1",
+  "primitive": {
+    "color": {
+      "navy": {
+        "950": "#0A0E17",
+        "900": "#0F172A",
+        "800": "#132043",
+        "700": "#1B2C56",
+        "600": "#1E3A8A"
+      },
+      "blue": {
+        "700": "#1E40AF",
+        "600": "#2563EB",
+        "500": "#3B82F6",
+        "300": "#93C5FD",
+        "100": "#DBEAFE",
+        "50": "#EFF6FF"
+      },
+      "amber": {
+        "700": "#B45309",
+        "600": "#D97706",
+        "500": "#F59E0B",
+        "200": "#FDE3B4",
+        "100": "#FEF3D9"
+      },
+      "slate": {
+        "900": "#0F172A",
+        "700": "#334155",
+        "500": "#64748B",
+        "300": "#CBD5E1",
+        "200": "#E2E8F0",
+        "100": "#F1F5F9",
+        "50": "#F8FAFC",
+        "0": "#FFFFFF"
+      },
+      "teal": { "600": "#0D9488", "500": "#14B8A6", "100": "#CCFBF1" },
+      "red": { "600": "#DC2626", "500": "#EF4444", "100": "#FEE2E2" }
+    },
+    "font": {
+      "family": {
+        "display": "'Space Grotesk', ui-sans-serif, sans-serif",
+        "body": "'Inter', ui-sans-serif, sans-serif",
+        "mono": "'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace"
+      },
+      "size": {
+        "xs": "0.75rem", "sm": "0.875rem", "base": "1rem", "md": "1.125rem",
+        "lg": "1.25rem", "xl": "1.5rem", "2xl": "1.875rem", "3xl": "2.375rem",
+        "4xl": "3rem", "5xl": "3.75rem"
+      },
+      "weight": { "regular": 400, "medium": 500, "semibold": 600, "bold": 700 },
+      "leading": { "tight": 1.15, "snug": 1.35, "normal": 1.55, "relaxed": 1.7 }
+    },
+    "space": { "0": "0", "1": "4px", "2": "8px", "3": "12px", "4": "16px", "5": "20px", "6": "24px", "8": "32px", "10": "40px", "12": "48px", "16": "64px", "20": "80px", "24": "96px" },
+    "radius": { "sm": "6px", "md": "10px", "lg": "14px", "xl": "20px", "full": "999px" },
+    "shadow": {
+      "sm": "0 1px 2px rgba(15,23,42,0.06)",
+      "md": "0 4px 16px rgba(15,23,42,0.10)",
+      "lg": "0 12px 32px rgba(15,23,42,0.16)",
+      "focus": "0 0 0 3px rgba(37,99,235,0.35)"
+    }
+  },
+  "semantic": {
+    "light": {
+      "bg": { "canvas": "{slate.50}", "surface": "{slate.0}", "raised": "{slate.0}", "inverse": "{navy.900}" },
+      "border": { "default": "{slate.200}", "subtle": "{slate.100}", "strong": "{slate.300}" },
+      "text": { "primary": "{navy.900}", "secondary": "{slate.700}", "muted": "{slate.500}", "inverse": "{slate.0}", "onAccent": "{navy.900}" },
+      "brand": { "primary": "{navy.600}", "primaryHover": "{navy.700}", "secondary": "{blue.500}", "accent": "{amber.600}", "accentHover": "{amber.700}" },
+      "status": { "success": "{teal.600}", "successBg": "{teal.100}", "warning": "{amber.600}", "warningBg": "{amber.100}", "danger": "{red.600}", "dangerBg": "{red.100}", "info": "{blue.600}", "infoBg": "{blue.50}" }
+    },
+    "dark": {
+      "bg": { "canvas": "{navy.950}", "surface": "{navy.900}", "raised": "{navy.800}", "inverse": "{slate.50}" },
+      "border": { "default": "{navy.700}", "subtle": "{navy.800}", "strong": "{navy.600}" },
+      "text": { "primary": "{slate.50}", "secondary": "{slate.300}", "muted": "{slate.500}", "inverse": "{navy.900}", "onAccent": "{navy.900}" },
+      "brand": { "primary": "{blue.500}", "primaryHover": "{blue.300}", "secondary": "{blue.300}", "accent": "{amber.500}", "accentHover": "{amber.200}" },
+      "status": { "success": "{teal.500}", "successBg": "#123832", "warning": "{amber.500}", "warningBg": "#3A2A10", "danger": "#F87171", "dangerBg": "#3A1616", "info": "{blue.300}", "infoBg": "#122540" }
+    }
+  },
+  "component": {
+    "button.primary": { "bg": "{brand.primary}", "bgHover": "{brand.primaryHover}", "text": "{text.inverse}", "radius": "{radius.md}" },
+    "button.accent": { "bg": "{brand.accent}", "bgHover": "{brand.accentHover}", "text": "{text.onAccent}", "radius": "{radius.md}" },
+    "card": { "bg": "{bg.surface}", "border": "{border.default}", "radius": "{radius.lg}", "shadow": "{shadow.sm}" },
+    "badge": { "radius": "{radius.full}", "paddingX": "{space.3}", "paddingY": "{space.1}" },
+    "input": { "bg": "{bg.surface}", "border": "{border.strong}", "radius": "{radius.md}", "focusRing": "{shadow.focus}" }
+  }
+}
