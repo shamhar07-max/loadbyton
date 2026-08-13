@@ -408,7 +408,7 @@ function MembersTab() {
           </table>
         </div>
       ) : (
-        <EmptyState icon={<IconUser size={26} />} title="No members found" description "Try adjusting the filters above." />
+        <EmptyState icon={<IconUser size={26} />} title="No members found" description="Try adjusting the filters above." />
       )}
     </div>
   );
