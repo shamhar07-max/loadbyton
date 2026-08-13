@@ -222,6 +222,27 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- VAT tax invoices for platform commission — see server/lib/invoice.js for
+-- the numbering scheme and the tax-inclusive-fee assumption this bakes in.
+CREATE TABLE IF NOT EXISTS invoices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_number TEXT UNIQUE NOT NULL,
+  payout_id INTEGER NOT NULL REFERENCES payouts(id),
+  job_id INTEGER NOT NULL REFERENCES jobs(id),
+  carrier_id INTEGER NOT NULL REFERENCES users(id),
+  supplier_trn TEXT,
+  customer_trn TEXT,
+  gross_aed REAL NOT NULL,
+  commission_aed REAL NOT NULL,
+  vat_rate_bps INTEGER NOT NULL,
+  taxable_aed REAL NOT NULL,
+  vat_aed REAL NOT NULL,
+  total_aed REAL NOT NULL,
+  issued_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_invoices_carrier ON invoices(carrier_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_job ON invoices(job_id);
 `);
 
 // ---------------------------------------------------------------------------

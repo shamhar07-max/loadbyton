@@ -73,6 +73,7 @@ export const api = {
   createContract: (body) => post('/contracts', body),
   analytics: () => get('/analytics/mine'),
   earnings: () => get('/earnings'),
+  invoices: () => get('/invoices'),
   notifications: () => get('/notifications'),
   markNotificationsRead: () => post('/notifications/read'),
 

@@ -98,6 +98,25 @@ test('core loop: post -> bid -> award -> pod -> status, with escrow and payout t
   assert.equal(audit.status, 200);
   const awardEntry = audit.body.entries.find((e) => e.action === 'AWARD' && e.entity_id === jobId);
   assert.ok(awardEntry, 'award must be recorded in the append-only audit log');
+
+  // Shipper confirms delivery -> payout releases (MANUAL) -> a VAT invoice
+  // must exist for the carrier, with a taxable value + VAT that reconciles
+  // against the platform fee actually deducted (agreed price 650 @ 6%).
+  const completed = await shipper.patch(`/api/jobs/${jobId}/status`, { status: 'COMPLETED' });
+  assert.equal(completed.status, 200, completed.raw);
+
+  const invoices = await carrier.get('/api/invoices');
+  assert.equal(invoices.status, 200);
+  const invoice = invoices.body.invoices.find((i) => i.job_id === jobId);
+  assert.ok(invoice, 'a VAT invoice must be issued when a payout releases');
+  assert.match(invoice.invoice_number, /^LBT-INV-\d{4}-\d{6}$/);
+  const expectedFee = Math.round((650 * 600) / 10000); // commission_rate_bps default = 600 (6%)
+  assert.equal(invoice.commission_aed, expectedFee);
+  assert.ok(Math.abs(invoice.taxable_aed + invoice.vat_aed - invoice.total_aed) < 0.01, 'taxable + VAT must reconcile to total');
+
+  const invoiceDoc = await carrier.get(`/api/invoices/${invoice.id}`);
+  assert.equal(invoiceDoc.status, 200);
+  assert.match(invoiceDoc.raw, /Tax Invoice/);
 });
 
 test('auto-release sweep (x-internal-key) releases past-window deliveries without an admin session', async () => {

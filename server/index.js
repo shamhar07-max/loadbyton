@@ -10,6 +10,7 @@ const bcrypt = require('bcryptjs');
 const db = require('./db');
 const totp = require('./lib/totp');
 const { unifiedLanes, estimateRate, optimizeRoute } = require('./lib/lanes');
+const { issueInvoice, renderInvoiceHtml } = require('./lib/invoice');
 const {
   cookieParser,
   requestId,
@@ -227,6 +228,7 @@ function runAutoReleaseSweep(req) {
         `UPDATE jobs SET escrow_status='RELEASED', auto_release_processed=1, payout_released_at=datetime('now'), updated_at=datetime('now') WHERE id=?`
       ).run(job.id);
       db.prepare(`UPDATE payouts SET status='RELEASED', release_type='AUTO_24H', released_at=datetime('now') WHERE job_id=?`).run(job.id);
+      issueInvoice(db, job.id);
       writeAudit(req, {
         action: 'ESCROW_RELEASE',
         details: `Auto-released ${job.job_code} after ${auto_release_hours}h (silent assent).`,
@@ -699,6 +701,7 @@ app.patch('/api/jobs/:id/status', auth(), (req, res) => {
   if (next === 'COMPLETED' && job.escrow_status !== 'RELEASED') {
     db.prepare(`UPDATE jobs SET escrow_status='RELEASED', payout_released_at=datetime('now') WHERE id=?`).run(job.id);
     db.prepare(`UPDATE payouts SET status='RELEASED', release_type='MANUAL', released_at=datetime('now') WHERE job_id=?`).run(job.id);
+    issueInvoice(db, job.id);
     notify(job.carrier_id, 'Funds on the way', `${job.job_code} was confirmed delivered. Payout released.`, job.id);
   }
 
@@ -966,6 +969,24 @@ app.get('/api/earnings', auth(['CARRIER']), (req, res) => {
   res.json({ payouts: rows, totals: { paid, pending } });
 });
 
+app.get('/api/invoices', auth(['CARRIER', 'ADMIN']), (req, res) => {
+  const invoices =
+    req.user.role === 'ADMIN'
+      ? db.prepare(`SELECT i.*, j.job_code FROM invoices i JOIN jobs j ON j.id = i.job_id ORDER BY i.issued_at DESC LIMIT 200`).all()
+      : db.prepare(`SELECT i.*, j.job_code FROM invoices i JOIN jobs j ON j.id = i.job_id WHERE i.carrier_id=? ORDER BY i.issued_at DESC`).all(req.user.id);
+  res.json({ invoices });
+});
+
+app.get('/api/invoices/:id', auth(['CARRIER', 'ADMIN']), (req, res) => {
+  const invoice = db.prepare('SELECT * FROM invoices WHERE id=?').get(req.params.id);
+  if (!invoice) return sendError(res, 404, 'Invoice not found');
+  if (req.user.role !== 'ADMIN' && invoice.carrier_id !== req.user.id) return sendError(res, 403, 'Not your invoice');
+  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(invoice.job_id);
+  const carrierProfile = db.prepare('SELECT * FROM profiles WHERE user_id=?').get(invoice.carrier_id);
+  if (req.query.format === 'json') return res.json({ invoice, job });
+  res.set('Content-Type', 'text/html').send(renderInvoiceHtml({ invoice, job, carrierProfile }));
+});
+
 app.get('/api/notifications', auth(), (req, res) => {
   const notifications = db.prepare('SELECT * FROM notifications WHERE user_id=? ORDER BY is_read ASC, created_at DESC LIMIT 100').all(req.user.id);
   res.json({ notifications });
@@ -1190,6 +1211,7 @@ app.post('/api/admin/disputes/:id/resolve', auth(['ADMIN']), (req, res) => {
     db.prepare(`UPDATE payouts SET status='CANCELLED' WHERE job_id=?`).run(job.id);
   } else {
     db.prepare(`UPDATE payouts SET status='RELEASED', release_type='DISPUTE_RESOLUTION', released_at=datetime('now') WHERE job_id=?`).run(job.id);
+    issueInvoice(db, job.id);
   }
   db.prepare(`UPDATE jobs SET status='COMPLETED', escrow_status='RELEASED', payout_released_at=datetime('now'), updated_at=datetime('now') WHERE id=?`).run(job.id);
   db.prepare(`UPDATE disputes SET status='RESOLVED', determination=?, decision=?, resolved_by=?, resolved_at=datetime('now') WHERE id=?`).run(

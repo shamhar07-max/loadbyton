@@ -89,6 +89,9 @@ curl -s localhost:4000/api/public/lanes
 | `FRONTEND_URL` | `http://localhost:5173` | CORS allowlist for the dev SPA |
 | `DB_PATH` | `server/data/loadbyton.db` | SQLite file location |
 | `INTERNAL_KEY` | random per boot | `x-internal-key` for `/api/system/auto-release` (admin also allowed) |
+| `PLATFORM_TRN` | unset | Loadbyton's own TRN, printed on every commission tax invoice (`server/lib/invoice.js`). Invoices render a visible warning until this is set — never fabricate a placeholder TRN in production. |
+| `PLATFORM_LEGAL_NAME` | `Loadbyton` | Supplier legal name on tax invoices |
+| `ENCRYPTION_KEY` | none (required outside dev) | AES-256-GCM key for IBAN/TRN field encryption — see `server/lib/crypto.js` |
 
 Platform settings (runtime, not env): `commission_rate_bps` (default 600) and `auto_release_hours` (default 24), editable by admin via `PATCH /api/admin/settings`.
 

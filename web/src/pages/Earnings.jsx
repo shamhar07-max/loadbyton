@@ -49,11 +49,17 @@ export default function Earnings() {
   const [totals, setTotals] = useState({ paid: 0, pending: 0 });
   const [releaseFilter, setReleaseFilter] = useState('all');
   const [dateRange, setDateRange] = useState('all');
+  const [invoiceByJob, setInvoiceByJob] = useState({});
 
   useEffect(() => {
     api.earnings().then((d) => {
       setPayouts(d.payouts);
       setTotals(d.totals);
+    }).catch(() => {});
+    api.invoices().then((d) => {
+      const byJob = {};
+      for (const inv of d.invoices) byJob[inv.job_id] = inv;
+      setInvoiceByJob(byJob);
     }).catch(() => {});
   }, []);
 
@@ -128,6 +134,7 @@ export default function Earnings() {
                     <th className="px-5 py-3 font-medium">Status</th>
                     <th className="px-5 py-3 font-medium">Release</th>
                     <th className="px-5 py-3 font-medium">Released</th>
+                    <th className="px-5 py-3 font-medium">Invoice</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -142,6 +149,15 @@ export default function Earnings() {
                       <td className="px-5 py-3"><Badge color={STATUS_COLOR[p.payout_status] || 'neutral'}>{p.payout_status}</Badge></td>
                       <td className="px-5 py-3 text-ink-muted">{RELEASE_LABEL[p.release_type] || '—'}</td>
                       <td className="px-5 py-3 text-ink-muted">{formatDate(p.released_at)}</td>
+                      <td className="px-5 py-3">
+                        {invoiceByJob[p.job_id] ? (
+                          <a href={`/api/invoices/${invoiceByJob[p.job_id].id}`} target="_blank" rel="noreferrer" className="text-brand-primary hover:underline">
+                            {invoiceByJob[p.job_id].invoice_number}
+                          </a>
+                        ) : (
+                          <span className="text-ink-muted">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
