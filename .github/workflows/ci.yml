@@ -1,0 +1,35 @@
+name: CI
+
+# Gate every push/PR to main on: the SPA build succeeding, AND the API
+# actually working end-to-end (not just parsing). TODOS.md's own August 13
+# entry documents eight features that shipped broken despite a clean build —
+# this workflow exists so that class of regression fails the merge instead
+# of reaching production.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install web deps
+        run: cd web && npm ci
+
+      - name: Build web (SPA + SEO pages)
+        run: cd web && npm run build
+
+      - name: Install server deps
+        run: cd server && npm ci
+
+      - name: API smoke suite (isolated temp DB, real HTTP calls)
+        run: cd server && npm test
