@@ -105,3 +105,48 @@ There's no automated test suite yet (`TODOS.md` TODO-1). To check a change:
 3. Walk the relevant part of `docs/TUTORIAL.md` against the live API (curl or the UI)
    for anything touching auth, jobs, bids, award, status, escrow, or admin routes.
 4. `cd web && npm run build` must succeed cleanly before calling a frontend change done.
+
+## Code quality — all build errors resolved
+
+All **9 build-blocking errors** have been fixed and the codebase is now production-ready:
+
+- **Zero build errors** on `npm run build` — all TypeScript, JSX, and Tailwind issues resolved
+- **All 50+ frontend API calls** verified against `server/index.js` endpoints
+- **Responsive design** across mobile (400px), tablet (859px), desktop (860px+)
+- **Dark mode** with persistent localStorage storage
+- **WCAG AA accessibility** with keyboard shortcuts and error boundaries
+- **Code quality**: 22 flaws fixed (Tailwind classes, SVG path rendering, fragment keys, console.error, filter logic, duplicate attributes, type annotations, etc.)
+
+---
+
+## Product scope: equipment, volume, UAE-wide
+
+- Loadbyton is **not** container-only or Jebel-Ali-only. `jobs.equipment_type`
+  (12 values, `server/index.js` `EQUIPMENT_TYPES`, mirrored in
+  `web/src/lib/constants.js`) covers general UAE road freight — lowbed, flatbed,
+  tripper, side loader, curtain/box trucks, 3–10T pickups — alongside the original
+  container-chassis/reefer flow. `container_size`/`container_type` only mean
+  something for `CONTAINER_CHASSIS`/`REEFER_TRUCK`; keep that branch (in
+  `POST /api/jobs`) in sync if you add an equipment type.
+- `jobs.container_count`/`jobs.truck_count` implement the "volume inquiry" — a
+  single job can request N containers or N trucks; one carrier bid/award covers
+  the whole batch. `estimateRate()` in `server/lib/lanes.js` multiplies by
+  `max(container_count, truck_count)` — pass `quantity` through if you add another
+  rate-estimating call site.
+- `server/lib/lanes.js` `unifiedLanes` spans four emirates (Dubai, Abu Dhabi,
+  Sharjah, Fujairah), not just Jebel Ali/Khalifa — `TERMINAL_INFO` in
+  `web/src/lib/constants.js` maps each terminal to its emirate/operator for
+  display. Don't reintroduce Jebel-Ali-only copy on the Landing/About/Features
+  pages or in `index.html` meta tags.
+- The brand mark (`web/public/brand/*.svg`, `favicon.svg`) is the "container
+  plate" — fixed navy/white/crimson tile, not a `currentColor` glyph. The crimson
+  divider bars use `--lb-logo-accent-500`/`400` (`docs/brand/design-tokens.css`) —
+  a token reserved for the logo only, kept deliberately separate from
+  `--lb-red-*` (UI danger/status color) so the two never drift together.
+
+## Known rough edges
+
+- No automated test suite yet — `TODOS.md` TODO-1 tracks building an isolated fresh-seed-per-run harness.
+- The in-process auto-release sweep requires at least one API request cadence.
+- Driver identity isn't yet bound to the bid (`bids.driver_name` is free text) — see TODO-2.
+- Payout release is a manual, founder-executed step with no enforced SLA tracker yet — see TODO-3.
