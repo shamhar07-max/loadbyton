@@ -107,11 +107,11 @@ export const Input = React.forwardRef(function Input({ className, ...props }, re
   return <input ref={ref} className={cx('input', className)} {...props} />;
 });
 export const Textarea = React.forwardRef(function Textarea({ className, ...props }, ref) {
-  return <textarea ref={ref} className={cx('input', className)} {...props} />;
+  return <textarea ref={ref} className={cx('textarea', className)} {...props} />;
 });
 export const Select = React.forwardRef(function Select({ className, children, ...props }, ref) {
   return (
-    <select ref={ref} className={cx('input', className)} {...props}>
+    <select ref={ref} className={cx('select', className)} {...props}>
       {children}
     </select>
   );

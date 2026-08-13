@@ -58,7 +58,7 @@ export default function Landing() {
               </div>
               <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                 {(lanes.length ? lanes : Array.from({ length: 5 })).map((lane, i) => (
-                  <div key={lane?.laneId || i} className="flex items-center justify-between px-5 py-3 text-sm" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                  <div key={i} className="flex items-center justify-between px-5 py-3 text-sm" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                     <div className="min-w-0">
                       <p className="truncate font-medium text-white">{lane ? `${formatLabel(lane.terminal)} → ${formatLabel(lane.area)}` : 'Loading…'}</p>
                       <p className="tabular text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{lane ? `${lane.distanceKm} km · ${lane.onTimePct}% on-time` : ''}</p>

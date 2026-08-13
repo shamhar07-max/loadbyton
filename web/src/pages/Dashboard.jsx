@@ -28,6 +28,8 @@ export default function Dashboard() {
   const [form, setForm] = useState(emptyJob);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [filter, setFilter] = useState('all');
+  const filteredJobs = filter === 'all' ? jobs : jobs.filter((j) => j.status === filter);
   const { addToast } = useToasts();
 
   function load() {
@@ -220,7 +222,7 @@ export default function Dashboard() {
         ) : (
           <div className="mt-3">
             <p className="text-sm text-ink-muted">Filter: 
-              <Select onChange={(e) => {/* filter logic */}}>
+              <Select value={filter} onChange={(e) => setFilter(e.target.value)}>
                 <option value="all">All</option>
                 <option value="open">Open</option>
                 <option value="awarded">Awarded</option>
@@ -240,7 +242,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {jobs.map((j) => (
+                    {filteredJobs.map((j) => (
                       <tr key={j.id} className="border-b last:border-0 hover:bg-raised" style={{ borderColor: 'var(--border-subtle)' }}>
                         <td className="px-5 py-3">
                           <p className="font-mono text-xs text-ink-muted">{j.job_code}</p>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, roleHome } from '../lib/auth.jsx';
 import { IconMenu, IconClose, IconBell, IconLogOut, IconUser, IconMoon, IconSun } from './icons.jsx';
 import { useToasts } from './Toast.jsx';
@@ -60,15 +60,15 @@ export function Shell({ children }) {
             <Logo />
             <nav className="hidden items-center gap-1 md:flex">
               {navItems.map((item) => (
-                <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>
+                <NavLink key={item.label} to={item.to} className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>
                   {item.label}
                 </NavLink>
               ))}
               {!user && (
                 <>
-                  <NavLink to="/features" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>Features</NavLink>
-                  <NavLink to="/pricing" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>Pricing</NavLink>
-                  <NavLink to="/about" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>About</NavLink>
+                  <NavLink key="features" to="/features" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>Features</NavLink>
+                  <NavLink key="pricing" to="/pricing" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>Pricing</NavLink>
+                  <NavLink key="about" to="/about" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>About</NavLink>
                 </>
               )}
             </nav>

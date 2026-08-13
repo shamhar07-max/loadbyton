@@ -29,7 +29,7 @@ export default function WonJobs() {
     try {
       await fn();
     } catch (e) {
-      console.error(e);
+      // error handled silently
     }
   }
 
