@@ -1,0 +1,165 @@
+/*
+  Loadbyton design tokens — canonical source.
+  Mirrored into web/src/index.css and consumed by web/tailwind.config.js.
+  Three layers: primitive (raw values) -> semantic (role-based) -> component.
+  Light is the default (:root); dark overrides via [data-theme="dark"] and,
+  absent an explicit choice, prefers-color-scheme.
+*/
+
+:root {
+  /* primitive: color */
+  --lb-navy-950: #0A0E17;
+  --lb-navy-900: #0F172A;
+  --lb-navy-800: #132043;
+  --lb-navy-700: #1B2C56;
+  --lb-navy-600: #1E3A8A;
+
+  --lb-blue-700: #1E40AF;
+  --lb-blue-600: #2563EB;
+  --lb-blue-500: #3B82F6;
+  --lb-blue-300: #93C5FD;
+  --lb-blue-100: #DBEAFE;
+  --lb-blue-50:  #EFF6FF;
+
+  --lb-amber-700: #B45309;
+  --lb-amber-600: #D97706;
+  --lb-amber-500: #F59E0B;
+  --lb-amber-200: #FDE3B4;
+  --lb-amber-100: #FEF3D9;
+
+  --lb-slate-900: #0F172A;
+  --lb-slate-700: #334155;
+  --lb-slate-500: #64748B;
+  --lb-slate-300: #CBD5E1;
+  --lb-slate-200: #E2E8F0;
+  --lb-slate-100: #F1F5F9;
+  --lb-slate-50:  #F8FAFC;
+  --lb-slate-0:   #FFFFFF;
+
+  --lb-teal-600: #0D9488;
+  --lb-teal-500: #14B8A6;
+  --lb-teal-100: #CCFBF1;
+  --lb-red-600: #DC2626;
+  --lb-red-500: #EF4444;
+  --lb-red-100: #FEE2E2;
+
+  /* Reserved for the Loadbyton mark's divider bars only (web/public/brand/*
+     and favicon.svg). Never assign to a semantic/status/UI role — that's
+     what --lb-red-* above is for. Keeping these separate means the two can
+     never accidentally drift together. */
+  --lb-logo-accent-500: #D6321F;
+  --lb-logo-accent-400: #E0472F;
+
+  /* primitive: type */
+  --lb-font-display: 'Space Grotesk', ui-sans-serif, sans-serif;
+  --lb-font-body: 'Inter', ui-sans-serif, sans-serif;
+  --lb-font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* primitive: radius / shadow */
+  --lb-radius-sm: 6px;
+  --lb-radius-md: 10px;
+  --lb-radius-lg: 14px;
+  --lb-radius-xl: 20px;
+  --lb-radius-full: 999px;
+  --lb-shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
+  --lb-shadow-md: 0 4px 16px rgba(15,23,42,0.10);
+  --lb-shadow-lg: 0 12px 32px rgba(15,23,42,0.16);
+  --lb-shadow-focus: 0 0 0 3px rgba(37,99,235,0.35);
+
+  /* semantic: light theme (default) */
+  --bg-canvas: var(--lb-slate-50);
+  --bg-surface: var(--lb-slate-0);
+  --bg-raised: var(--lb-slate-0);
+  --bg-inverse: var(--lb-navy-900);
+
+  --border-default: var(--lb-slate-200);
+  --border-subtle: var(--lb-slate-100);
+  --border-strong: var(--lb-slate-300);
+
+  --text-primary: var(--lb-navy-900);
+  --text-secondary: var(--lb-slate-700);
+  --text-muted: var(--lb-slate-500);
+  --text-inverse: var(--lb-slate-0);
+  --text-on-accent: var(--lb-navy-900);
+
+  --brand-primary: var(--lb-navy-600);
+  --brand-primary-hover: var(--lb-navy-700);
+  --brand-secondary: var(--lb-blue-500);
+  --brand-accent: var(--lb-amber-600);
+  --brand-accent-hover: var(--lb-amber-700);
+
+  --status-success: var(--lb-teal-600);
+  --status-success-bg: var(--lb-teal-100);
+  --status-warning: var(--lb-amber-600);
+  --status-warning-bg: var(--lb-amber-100);
+  --status-danger: var(--lb-red-600);
+  --status-danger-bg: var(--lb-red-100);
+  --status-info: var(--lb-blue-600);
+  --status-info-bg: var(--lb-blue-50);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-canvas: var(--lb-navy-950);
+    --bg-surface: var(--lb-navy-900);
+    --bg-raised: var(--lb-navy-800);
+    --bg-inverse: var(--lb-slate-50);
+
+    --border-default: var(--lb-navy-700);
+    --border-subtle: var(--lb-navy-800);
+    --border-strong: var(--lb-navy-600);
+
+    --text-primary: var(--lb-slate-50);
+    --text-secondary: var(--lb-slate-300);
+    --text-muted: var(--lb-slate-500);
+    --text-inverse: var(--lb-navy-900);
+    --text-on-accent: var(--lb-navy-900);
+
+    --brand-primary: var(--lb-blue-500);
+    --brand-primary-hover: var(--lb-blue-300);
+    --brand-secondary: var(--lb-blue-300);
+    --brand-accent: var(--lb-amber-500);
+    --brand-accent-hover: var(--lb-amber-200);
+
+    --status-success: var(--lb-teal-500);
+    --status-success-bg: #123832;
+    --status-warning: var(--lb-amber-500);
+    --status-warning-bg: #3A2A10;
+    --status-danger: #F87171;
+    --status-danger-bg: #3A1616;
+    --status-info: var(--lb-blue-300);
+    --status-info-bg: #122540;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg-canvas: var(--lb-navy-950);
+  --bg-surface: var(--lb-navy-900);
+  --bg-raised: var(--lb-navy-800);
+  --bg-inverse: var(--lb-slate-50);
+
+  --border-default: var(--lb-navy-700);
+  --border-subtle: var(--lb-navy-800);
+  --border-strong: var(--lb-navy-600);
+
+  --text-primary: var(--lb-slate-50);
+  --text-secondary: var(--lb-slate-300);
+  --text-muted: var(--lb-slate-500);
+  --text-inverse: var(--lb-navy-900);
+  --text-on-accent: var(--lb-navy-900);
+
+  --brand-primary: var(--lb-blue-500);
+  --brand-primary-hover: var(--lb-blue-300);
+  --brand-secondary: var(--lb-blue-300);
+  --brand-accent: var(--lb-amber-500);
+  --brand-accent-hover: var(--lb-amber-200);
+
+  --status-success: var(--lb-teal-500);
+  --status-success-bg: #123832;
+  --status-warning: var(--lb-amber-500);
+  --status-warning-bg: #3A2A10;
+  --status-danger: #F87171;
+  --status-danger-bg: #3A1616;
+  --status-info: var(--lb-blue-300);
+  --status-info-bg: #122540;
+}

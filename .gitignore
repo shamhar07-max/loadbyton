@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+web/dist/
+*.log

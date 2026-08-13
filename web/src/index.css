@@ -1,0 +1,261 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Loadbyton design tokens — mirrors docs/brand/design-tokens.css.
+  Light is default (:root); dark via [data-theme="dark"] or, absent an
+  explicit choice, prefers-color-scheme. See docs/brand/BRAND_GUIDELINES.md.
+*/
+:root {
+  --lb-navy-950: #0A0E17;
+  --lb-navy-900: #0F172A;
+  --lb-navy-800: #132043;
+  --lb-navy-700: #1B2C56;
+  --lb-navy-600: #1E3A8A;
+
+  --lb-blue-700: #1E40AF;
+  --lb-blue-600: #2563EB;
+  --lb-blue-500: #3B82F6;
+  --lb-blue-300: #93C5FD;
+  --lb-blue-100: #DBEAFE;
+  --lb-blue-50: #EFF6FF;
+
+  --lb-amber-700: #B45309;
+  --lb-amber-600: #D97706;
+  --lb-amber-500: #F59E0B;
+  --lb-amber-200: #FDE3B4;
+  --lb-amber-100: #FEF3D9;
+
+  --lb-slate-900: #0F172A;
+  --lb-slate-700: #334155;
+  --lb-slate-500: #64748B;
+  --lb-slate-300: #CBD5E1;
+  --lb-slate-200: #E2E8F0;
+  --lb-slate-100: #F1F5F9;
+  --lb-slate-50: #F8FAFC;
+  --lb-slate-0: #FFFFFF;
+
+  --lb-teal-600: #0D9488;
+  --lb-teal-500: #14B8A6;
+  --lb-teal-100: #CCFBF1;
+  --lb-red-600: #DC2626;
+  --lb-red-500: #EF4444;
+  --lb-red-100: #FEE2E2;
+
+  --lb-radius-sm: 6px;
+  --lb-radius-md: 10px;
+  --lb-radius-lg: 14px;
+  --lb-radius-xl: 20px;
+  --lb-shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
+  --lb-shadow-md: 0 4px 16px rgba(15,23,42,0.10);
+  --lb-shadow-lg: 0 12px 32px rgba(15,23,42,0.16);
+  --lb-shadow-focus: 0 0 0 3px rgba(37,99,235,0.35);
+
+  --bg-canvas: var(--lb-slate-50);
+  --bg-surface: var(--lb-slate-0);
+  --bg-raised: var(--lb-slate-0);
+  --bg-inverse: var(--lb-navy-900);
+
+  --border-default: var(--lb-slate-200);
+  --border-subtle: var(--lb-slate-100);
+  --border-strong: var(--lb-slate-300);
+
+  --text-primary: var(--lb-navy-900);
+  --text-secondary: var(--lb-slate-700);
+  --text-muted: var(--lb-slate-500);
+  --text-inverse: var(--lb-slate-0);
+  --text-on-accent: var(--lb-navy-900);
+
+  --brand-primary: var(--lb-navy-600);
+  --brand-primary-hover: var(--lb-navy-700);
+  --brand-secondary: var(--lb-blue-500);
+  --brand-accent: var(--lb-amber-600);
+  --brand-accent-hover: var(--lb-amber-700);
+
+  --status-success: var(--lb-teal-600);
+  --status-success-bg: var(--lb-teal-100);
+  --status-warning: var(--lb-amber-600);
+  --status-warning-bg: var(--lb-amber-100);
+  --status-danger: var(--lb-red-600);
+  --status-danger-bg: var(--lb-red-100);
+  --status-info: var(--lb-blue-600);
+  --status-info-bg: var(--lb-blue-50);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-canvas: var(--lb-navy-950);
+    --bg-surface: var(--lb-navy-900);
+    --bg-raised: var(--lb-navy-800);
+    --bg-inverse: var(--lb-slate-50);
+    --border-default: var(--lb-navy-700);
+    --border-subtle: var(--lb-navy-800);
+    --border-strong: var(--lb-navy-600);
+    --text-primary: var(--lb-slate-50);
+    --text-secondary: var(--lb-slate-300);
+    --text-muted: var(--lb-slate-500);
+    --text-inverse: var(--lb-navy-900);
+    --text-on-accent: var(--lb-navy-900);
+    --brand-primary: var(--lb-blue-500);
+    --brand-primary-hover: var(--lb-blue-300);
+    --brand-secondary: var(--lb-blue-300);
+    --brand-accent: var(--lb-amber-500);
+    --brand-accent-hover: var(--lb-amber-200);
+    --status-success: var(--lb-teal-500);
+    --status-success-bg: #123832;
+    --status-warning: var(--lb-amber-500);
+    --status-warning-bg: #3A2A10;
+    --status-danger: #F87171;
+    --status-danger-bg: #3A1616;
+    --status-info: var(--lb-blue-300);
+    --status-info-bg: #122540;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg-canvas: var(--lb-navy-950);
+  --bg-surface: var(--lb-navy-900);
+  --bg-raised: var(--lb-navy-800);
+  --bg-inverse: var(--lb-slate-50);
+  --border-default: var(--lb-navy-700);
+  --border-subtle: var(--lb-navy-800);
+  --border-strong: var(--lb-navy-600);
+  --text-primary: var(--lb-slate-50);
+  --text-secondary: var(--lb-slate-300);
+  --text-muted: var(--lb-slate-500);
+  --text-inverse: var(--lb-navy-900);
+  --text-on-accent: var(--lb-navy-900);
+  --brand-primary: var(--lb-blue-500);
+  --brand-primary-hover: var(--lb-blue-300);
+  --brand-secondary: var(--lb-blue-300);
+  --brand-accent: var(--lb-amber-500);
+  --brand-accent-hover: var(--lb-amber-200);
+  --status-success: var(--lb-teal-500);
+  --status-success-bg: #123832;
+  --status-warning: var(--lb-amber-500);
+  --status-warning-bg: #3A2A10;
+  --status-danger: #F87171;
+  --status-danger-bg: #3A1616;
+  --status-info: var(--lb-blue-300);
+  --status-info-bg: #122540;
+}
+
+* { border-color: var(--border-default); }
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: 'Inter', ui-sans-serif, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: 'Space Grotesk', ui-sans-serif, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-secondary);
+  outline-offset: 2px;
+  border-radius: var(--lb-radius-sm);
+}
+
+::selection {
+  background: var(--lb-amber-200);
+  color: var(--lb-navy-900);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Component classes — in @layer components so plain Tailwind utility  */
+/* classes (hidden, w-full, sm:inline-flex, …) always win the cascade  */
+/* when combined with these, regardless of source order.               */
+/* ------------------------------------------------------------------ */
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-content px-5 sm:px-6 lg:px-8;
+  }
+
+  .card {
+    @apply rounded-lg border bg-surface shadow-sm;
+    border-color: var(--border-default);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold
+      transition-transform duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap;
+  }
+  .btn-primary {
+    @apply btn text-ink-inverse;
+    background: var(--brand-primary);
+  }
+  .btn-primary:hover { background: var(--brand-primary-hover); }
+
+  .btn-accent {
+    @apply btn;
+    background: var(--brand-accent);
+    color: var(--text-on-accent);
+  }
+  .btn-accent:hover { background: var(--brand-accent-hover); }
+
+  .btn-secondary {
+    @apply btn border bg-surface text-ink;
+    border-color: var(--border-strong);
+  }
+  .btn-secondary:hover { background: var(--bg-raised); }
+
+  .btn-ghost {
+    @apply btn text-ink-secondary;
+  }
+  .btn-ghost:hover { background: var(--bg-raised); color: var(--text-primary); }
+
+  .btn-danger {
+    @apply btn;
+    background: var(--status-danger);
+    color: white;
+  }
+  .btn-danger:hover { filter: brightness(0.92); }
+
+  .input {
+    @apply w-full rounded-md border bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted;
+    border-color: var(--border-strong);
+  }
+  .input:focus {
+    outline: none;
+    box-shadow: var(--lb-shadow-focus);
+    border-color: var(--brand-secondary);
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-secondary;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+
+  .nav-link {
+    @apply rounded-md px-3 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-raised hover:text-ink;
+  }
+  .nav-link-active {
+    @apply nav-link text-ink bg-raised;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
