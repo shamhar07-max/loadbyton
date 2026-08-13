@@ -103,10 +103,10 @@ module.exports = function seed() {
       );
     return Number(r.lastInsertRowid);
   }
-  function insertBid(jobId, carrierId, amount, eta, status, driverName, truckType) {
+  function insertBid(jobId, carrierId, amount, eta, status, driverName, truckType, driverPhone) {
     const r = db
-      .prepare('INSERT INTO bids (job_id, carrier_id, amount_aed, eta_minutes, truck_type, driver_name, status) VALUES (?,?,?,?,?,?,?)')
-      .run(jobId, carrierId, amount, eta, truckType, driverName, status);
+      .prepare('INSERT INTO bids (job_id, carrier_id, amount_aed, eta_minutes, truck_type, driver_name, driver_phone, status) VALUES (?,?,?,?,?,?,?,?)')
+      .run(jobId, carrierId, amount, eta, truckType, driverName, driverPhone || '+971501234567', status);
     return Number(r.lastInsertRowid);
   }
 
@@ -149,6 +149,7 @@ module.exports = function seed() {
   });
   const job3Bid = insertBid(job3, emiratesId, 900, 50, 'ACCEPTED', 'Hamdan Youssef', '3-axle flatbed');
   db.prepare('UPDATE jobs SET awarded_bid_id=? WHERE id=?').run(job3Bid, job3);
+  db.prepare("UPDATE jobs SET assigned_driver_name=?, assigned_driver_phone='+971501234567' WHERE id=?").run('Hamdan Youssef', job3);
   db.prepare('INSERT INTO payouts (job_id, carrier_id, gross_aed, platform_fee_aed, net_aed, status, release_type) VALUES (?,?,?,?,?,\'PENDING\',\'MANUAL\')').run(job3, emiratesId, 900, 54, 846);
 
   // Job 4 — IN_TRANSIT, reefer, awarded to Gulf Heavy (the ACCEPTED reefer bid).
@@ -161,6 +162,7 @@ module.exports = function seed() {
   });
   const job4Bid = insertBid(job4, gulfheavyId, 1600, 65, 'ACCEPTED', 'Imran Sheikh', 'Reefer trailer');
   db.prepare('UPDATE jobs SET awarded_bid_id=? WHERE id=?').run(job4Bid, job4);
+  db.prepare("UPDATE jobs SET assigned_driver_name=?, assigned_driver_phone='+971501234567' WHERE id=?").run('Imran Sheikh', job4);
   db.prepare('INSERT INTO payouts (job_id, carrier_id, gross_aed, platform_fee_aed, net_aed, status, release_type) VALUES (?,?,?,?,?,\'PENDING\',\'MANUAL\')').run(job4, gulfheavyId, 1600, 96, 1504);
 
   // Job 5 — DELIVERED, awarded to Falcon; already past the 24h auto-release
@@ -176,6 +178,7 @@ module.exports = function seed() {
   });
   const job5Bid = insertBid(job5, falconId, 520, 28, 'ACCEPTED', 'Rashid Al Falasi', '3-axle flatbed');
   db.prepare('UPDATE jobs SET awarded_bid_id=? WHERE id=?').run(job5Bid, job5);
+  db.prepare("UPDATE jobs SET assigned_driver_name=?, assigned_driver_phone='+971501234567' WHERE id=?").run('Rashid Al Falasi', job5);
   db.prepare("INSERT INTO job_documents (job_id, uploader_id, doc_type, title, file_url) VALUES (?,?,?,?,?)").run(job5, falconId, 'POD', 'Proof of delivery — signed', 'https://files.loadbyton.demo/pod-9042.pdf');
   db.prepare(
     "INSERT INTO payouts (job_id, carrier_id, gross_aed, platform_fee_aed, net_aed, status, release_type, released_at) VALUES (?,?,?,?,?,'RELEASED','AUTO_24H',?)"
@@ -191,6 +194,7 @@ module.exports = function seed() {
   });
   const job6Bid = insertBid(job6, emiratesId, 1200, 60, 'ACCEPTED', 'Hamdan Youssef', '3-axle flatbed');
   db.prepare('UPDATE jobs SET awarded_bid_id=? WHERE id=?').run(job6Bid, job6);
+  db.prepare("UPDATE jobs SET assigned_driver_name=?, assigned_driver_phone='+971501234567' WHERE id=?").run('Hamdan Youssef', job6);
   db.prepare(
     "INSERT INTO payouts (job_id, carrier_id, gross_aed, platform_fee_aed, net_aed, status, release_type, released_at) VALUES (?,?,?,?,?,'RELEASED','MANUAL',?)"
   ).run(job6, emiratesId, 1200, 72, 1128, sqliteTime(-6 * DAY));

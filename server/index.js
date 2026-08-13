@@ -56,6 +56,14 @@ const CONTAINER_TYPES = ['DRY', 'REEFER', 'HAZMAT', 'OPEN_TOP', 'FLAT_RACK'];
 const DOC_TYPES = ['CUSTOMS', 'RECEIPT', 'POD', 'LICENCE', 'INSURANCE', 'OTHER'];
 const STATUS_ORDER = ['DRAFT', 'OPEN', 'AWARDED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
 
+// UAE mobile: 05XXXXXXXX, +9715XXXXXXXX, or 9715XXXXXXXX — loose on purpose,
+// this only guards against an obviously-wrong value at the API boundary.
+const UAE_MOBILE_RE = /^(\+?971|0)?5\d{8}$/;
+function normalizeUaeMobile(raw) {
+  const digits = String(raw || '').replace(/[\s-]/g, '');
+  return UAE_MOBILE_RE.test(digits) ? digits : null;
+}
+
 // Equipment/vehicle types a job can require and a carrier can bid with. The
 // two container-carrying types are the only ones where container_size/
 // container_type mean anything — every other type is general UAE road
@@ -576,10 +584,13 @@ app.post('/api/jobs/:id/bids', auth(['CARRIER']), (req, res) => {
   const eta = Number(b.etaMinutes);
   if (!amount || amount <= 0) return sendError(res, 400, 'amountAed must be a positive number');
   if (!eta || eta < 1 || eta > 600) return sendError(res, 400, 'etaMinutes must be between 1 and 600');
+  if (!b.driverName) return sendError(res, 400, 'driverName is required');
+  const driverPhone = normalizeUaeMobile(b.driverPhone);
+  if (!driverPhone) return sendError(res, 400, 'driverPhone is required and must be a valid UAE mobile number');
 
   const result = db
-    .prepare('INSERT INTO bids (job_id, carrier_id, amount_aed, eta_minutes, truck_type, driver_name, notes) VALUES (?,?,?,?,?,?,?)')
-    .run(job.id, req.user.id, amount, eta, b.truckType || null, b.driverName || null, b.notes || null);
+    .prepare('INSERT INTO bids (job_id, carrier_id, amount_aed, eta_minutes, truck_type, driver_name, driver_phone, notes) VALUES (?,?,?,?,?,?,?,?)')
+    .run(job.id, req.user.id, amount, eta, b.truckType || null, b.driverName, driverPhone, b.notes || null);
   const bidId = Number(result.lastInsertRowid);
   writeAudit(req, { userId: req.user.id, action: 'BID_CREATE', details: `Bid AED ${amount} on ${job.job_code}`, entityType: 'bid', entityId: bidId });
   notify(job.shipper_id, 'New bid received', `${req.user.profile.company_name} bid AED ${amount} on ${job.job_code}.`, job.id);
@@ -641,8 +652,9 @@ app.post('/api/jobs/:id/award', auth(['SHIPPER']), (req, res) => {
     const net = gross - fee;
 
     db.prepare(
-      `UPDATE jobs SET status='AWARDED', awarded_bid_id=?, carrier_id=?, agreed_price_aed=?, escrow_status='HELD', updated_at=datetime('now') WHERE id=?`
-    ).run(bid.id, bid.carrier_id, gross, jobId);
+      `UPDATE jobs SET status='AWARDED', awarded_bid_id=?, carrier_id=?, agreed_price_aed=?, escrow_status='HELD',
+         assigned_driver_name=?, assigned_driver_phone=?, updated_at=datetime('now') WHERE id=?`
+    ).run(bid.id, bid.carrier_id, gross, bid.driver_name, bid.driver_phone, jobId);
     db.prepare(`UPDATE bids SET status='ACCEPTED', updated_at=datetime('now') WHERE id=?`).run(bid.id);
     db.prepare(`UPDATE bids SET status='REJECTED', updated_at=datetime('now') WHERE job_id=? AND id!=?`).run(jobId, bid.id);
     const payoutResult = db
@@ -717,6 +729,42 @@ app.patch('/api/jobs/:id/status', auth(), (req, res) => {
   const other = req.user.id === job.shipper_id ? job.carrier_id : job.shipper_id;
   notify(other, 'Job status updated', `${job.job_code} is now ${next}.`, job.id);
 
+  const updated = db.prepare('SELECT * FROM jobs WHERE id=?').get(job.id);
+  res.json({ job: updated });
+});
+
+// TODO-2: reassigning the driver on an awarded job is deliberately its own
+// audited action, not a silent field edit — a swapped driver phone with no
+// trail is exactly the container-theft vector (S1) this binding exists to
+// close. "Re-verification" here means re-supplying and re-validating both
+// fields, the same bar as the original bid, not just patching one field.
+app.patch('/api/jobs/:id/driver', auth(['CARRIER']), (req, res) => {
+  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
+  if (!job) return sendError(res, 404, 'Job not found');
+  if (job.carrier_id !== req.user.id) return sendError(res, 403, 'Not your job');
+  if (!['AWARDED', 'PICKED_UP', 'IN_TRANSIT'].includes(job.status)) {
+    return sendError(res, 403, 'Driver can only be reassigned before delivery');
+  }
+  const { driverName, driverPhone } = req.body || {};
+  if (!driverName) return sendError(res, 400, 'driverName is required');
+  const normalizedPhone = normalizeUaeMobile(driverPhone);
+  if (!normalizedPhone) return sendError(res, 400, 'driverPhone is required and must be a valid UAE mobile number');
+
+  db.prepare(`UPDATE jobs SET assigned_driver_name=?, assigned_driver_phone=?, updated_at=datetime('now') WHERE id=?`).run(
+    driverName,
+    normalizedPhone,
+    job.id
+  );
+  writeAudit(req, {
+    userId: req.user.id,
+    action: 'DRIVER_REASSIGN',
+    details: `${job.job_code}: driver changed from ${job.assigned_driver_name || 'unset'} (${job.assigned_driver_phone || 'unset'}) to ${driverName} (${normalizedPhone})`,
+    entityType: 'job',
+    entityId: job.id,
+    beforeState: job.assigned_driver_phone || 'unset',
+    afterState: normalizedPhone,
+  });
+  notify(job.shipper_id, 'Driver reassigned', `${job.job_code}: the assigned driver was changed to ${driverName}.`, job.id);
   const updated = db.prepare('SELECT * FROM jobs WHERE id=?').get(job.id);
   res.json({ job: updated });
 });

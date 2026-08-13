@@ -63,7 +63,7 @@ test('core loop: post -> bid -> award -> pod -> status, with escrow and payout t
   const carrier = makeClient(server.baseUrl);
   await carrier.login('carrier@dubaidrayage.com', 'demo1234'); // seeded verified GOLD carrier
   const bidRes = await carrier.post(`/api/jobs/${jobId}/bids`, {
-    amountAed: 650, etaMinutes: 40, truckType: '3-axle flatbed', driverName: 'Hamdan Youssef',
+    amountAed: 650, etaMinutes: 40, truckType: '3-axle flatbed', driverName: 'Hamdan Youssef', driverPhone: '+971501112233',
   });
   assert.equal(bidRes.status, 201, bidRes.raw);
   const bidId = bidRes.body.bid.id;
@@ -79,6 +79,17 @@ test('core loop: post -> bid -> award -> pod -> status, with escrow and payout t
   // docs/ARCHITECTURE.md §3.3 and CLAUDE.md call out as non-negotiable.
   const doubleAward = await shipper.post(`/api/jobs/${jobId}/award`, { bidId });
   assert.equal(doubleAward.status, 409, 'a job already AWARDED must reject a second award attempt');
+
+  // TODO-2: the driver bound at award must come from the winning bid, not
+  // be left null, and reassigning it must be an audited action.
+  assert.equal(award.body.job.assigned_driver_phone, '+971501112233');
+
+  const badReassign = await carrier.patch(`/api/jobs/${jobId}/driver`, { driverName: 'New Driver', driverPhone: 'not-a-phone' });
+  assert.equal(badReassign.status, 400, 'an invalid phone must be rejected, not silently accepted');
+
+  const reassign = await carrier.patch(`/api/jobs/${jobId}/driver`, { driverName: 'Yusuf Al Naqbi', driverPhone: '0559998877' });
+  assert.equal(reassign.status, 200, reassign.raw);
+  assert.equal(reassign.body.job.assigned_driver_phone, '0559998877');
 
   const illegalSkip = await carrier.patch(`/api/jobs/${jobId}/status`, { status: 'IN_TRANSIT' });
   assert.equal(illegalSkip.status, 403, 'carrier must not be able to skip PICKED_UP');
@@ -98,6 +109,8 @@ test('core loop: post -> bid -> award -> pod -> status, with escrow and payout t
   assert.equal(audit.status, 200);
   const awardEntry = audit.body.entries.find((e) => e.action === 'AWARD' && e.entity_id === jobId);
   assert.ok(awardEntry, 'award must be recorded in the append-only audit log');
+  const reassignEntry = audit.body.entries.find((e) => e.action === 'DRIVER_REASSIGN' && e.entity_id === jobId);
+  assert.ok(reassignEntry, 'driver reassignment must be recorded in the audit log (anti-theft trail)');
 
   // Shipper confirms delivery -> payout releases (MANUAL) -> a VAT invoice
   // must exist for the carrier, with a taxable value + VAT that reconciles

@@ -270,6 +270,15 @@ addColumn('sessions', 'impersonating_admin_id', 'impersonating_admin_id INTEGER'
 
 addColumn('payouts', 'release_type', 'release_type TEXT');
 
+// TODO-2 (driver identity binding) — the driver actually assigned to a job
+// is now a first-class, phone-verified field, not free text buried in a bid.
+// bids.driver_phone is the phone offered at bid time; jobs.assigned_driver_*
+// is the current binding (set at award, changeable only via the audited
+// PATCH /api/jobs/:id/driver route — see server/index.js).
+addColumn('bids', 'driver_phone', 'driver_phone TEXT');
+addColumn('jobs', 'assigned_driver_name', 'assigned_driver_name TEXT');
+addColumn('jobs', 'assigned_driver_phone', 'assigned_driver_phone TEXT');
+
 addColumn('audit_log', 'entity_type', 'entity_type TEXT');
 addColumn('audit_log', 'entity_id', 'entity_id INTEGER');
 addColumn('audit_log', 'before_state', 'before_state TEXT');

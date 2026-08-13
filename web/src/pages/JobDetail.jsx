@@ -255,7 +255,7 @@ export default function JobDetail() {
 }
 
 function BidForm({ jobId, verified, defaultEquipment, onDone }) {
-  const [form, setForm] = useState({ amountAed: '', etaMinutes: '', truckType: defaultEquipment || 'CONTAINER_CHASSIS', driverName: '', notes: '' });
+  const [form, setForm] = useState({ amountAed: '', etaMinutes: '', truckType: defaultEquipment || 'CONTAINER_CHASSIS', driverName: '', driverPhone: '', notes: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -299,7 +299,12 @@ function BidForm({ jobId, verified, defaultEquipment, onDone }) {
       </div>
       <div>
         <Label>Driver name</Label>
-        <Input value={form.driverName} onChange={(e) => setForm({ ...form, driverName: e.target.value })} />
+        <Input required value={form.driverName} onChange={(e) => setForm({ ...form, driverName: e.target.value })} />
+      </div>
+      <div>
+        <Label>Driver mobile (UAE)</Label>
+        <Input required placeholder="05XXXXXXXX" value={form.driverPhone} onChange={(e) => setForm({ ...form, driverPhone: e.target.value })} />
+        <p className="mt-1 text-xs text-ink-muted">Bound to this job on award — the shipper's pickup/delivery messages reach this number only.</p>
       </div>
       {error && <p className="sm:col-span-2 text-sm text-status-danger">{error}</p>}
       <Button type="submit" className="sm:col-span-2" loading={busy}>Place bid</Button>
