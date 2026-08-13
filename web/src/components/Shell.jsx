@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth, roleHome } from '../lib/auth.jsx';
 import { IconMenu, IconClose, IconBell, IconLogOut, IconUser, IconMoon, IconSun } from './icons.jsx';
 import { useToasts } from './Toast.jsx';
@@ -23,7 +23,6 @@ const NAV_BY_ROLE = {
     { to: '/analytics-or-spend', label: 'Analytics', hidden: true },
   ],
   CARRIER: [
-    { to: '/', label: 'Dashboard' },
     { to: '/open-loads', label: 'Open loads' },
     { to: '/my-bids', label: 'My bids' },
     { to: '/won-jobs', label: 'Won jobs' },
@@ -109,22 +108,35 @@ export function Shell({ children }) {
                     </div>
                   )}
                 </div>
-              )
-              : (
-                <>
-                  <Link to="/login" className="btn-ghost hidden sm:inline-flex">Log in</Link>
-                  <Link to="/register" className="btn-primary">Get started</Link>
-                </>
-              )}
+              </>
             ) : (
               <>
-                <button className="nav-link md:hidden" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">
-                  {mobileOpen ? <IconClose size={20} /> : <IconMenu size={20} />}
-                </button>
+                <Link to="/login" className="btn-ghost hidden sm:inline-flex">Log in</Link>
+                <Link to="/register" className="btn-primary">Get started</Link>
               </>
             )}
+
+            <button className="nav-link md:hidden" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">
+              {mobileOpen ? <IconClose size={20} /> : <IconMenu size={20} />}
+            </button>
           </div>
         </div>
+
+        {mobileOpen && (
+          <nav className="border-t px-5 py-3 md:hidden" style={{ borderColor: 'var(--border-default)' }}>
+            <div className="flex flex-col gap-1">
+              {(user ? navItems : [
+                { to: '/features', label: 'Features' },
+                { to: '/pricing', label: 'Pricing' },
+                { to: '/about', label: 'About' }
+              ]).map((item) => (
+                <NavLink key={item.to} to={item.to} className="nav-link" onClick={() => setMobileOpen(false)}>
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          </nav>
+        )}
       </header>
 
       {user && !isWalkthroughFinished() && (
