@@ -1,17 +1,26 @@
 # Render Blueprint for Loadbyton — one service: Express serves both the
 # API and the built SPA (matches "production mode" in docs/DEVELOPER_GUIDE.md).
 #
-# NOTE on persistence: Render's free plan has an ephemeral filesystem — no
-# attached disk, so server/data/loadbyton.db (and anything written to it)
-# resets on every restart/redeploy. Fine for a demo (it just reseeds), not
-# fine for real data. To persist across restarts, switch `plan` to a paid
-# tier (`starter` or above) and uncomment the `disk` block below.
+# PERSISTENCE + DATA RESIDENCY — read before deploying real (non-demo) data:
+#   Render has no UAE/GCC region (closest is Frankfurt), and its free plan has
+#   no attached disk — server/data/loadbyton.db resets on every
+#   restart/redeploy. This file is now wired for the least-bad Render option
+#   (paid `starter` plan + persistent disk + Frankfurt, the nearest region to
+#   the UAE Render offers). For an actual UAE-resident, $0 alternative, use
+#   `deploy/oracle-cloud/` instead — Oracle Cloud's Always Free tier includes
+#   a real Abu Dhabi region (me-abudhabi-1) with persistent block storage at
+#   no cost. See deploy/oracle-cloud/README.md for the walkthrough.
+#
+# Either way: this file alone was previously the entire deploy story, which
+# is how a demo-only free-tier config ended up implied as production-ready.
+# Treat `plan: free` / `region: oregon` as a demo mode only, never as the
+# target for a customer's real data.
 services:
   - type: web
     name: loadbyton
     runtime: node
-    plan: free
-    region: oregon
+    plan: starter
+    region: frankfurt
     branch: main
     buildCommand: cd web && npm install && npm run build && cd ../server && npm install
     startCommand: cd server && node index.js
@@ -21,9 +30,29 @@ services:
         value: 22.22.2
       - key: FRONTEND_URL
         value: https://loadbyton.onrender.com
-      # - key: DB_PATH
-      #   value: /data/loadbyton.db   # only meaningful once a disk is mounted
-    # disk:
-    #   name: loadbyton-data
-    #   mountPath: /data
-    #   sizeGB: 1
+      - key: DB_PATH
+        value: /data/loadbyton.db
+      - key: ENCRYPTION_KEY
+        generateValue: true   # AES-256-GCM key for IBAN/TRN field encryption — see server/lib/crypto.js
+    disk:
+      name: loadbyton-data
+      mountPath: /data
+      sizeGB: 1
+
+# --- Demo-mode fallback (no card required, no data persistence guarantee) ---
+# Uncomment this service and comment out the one above to go back to a
+# throwaway free-tier deploy. Never point real shipper/carrier data at it.
+#   - type: web
+#     name: loadbyton-demo
+#     runtime: node
+#     plan: free
+#     region: oregon
+#     branch: main
+#     buildCommand: cd web && npm install && npm run build && cd ../server && npm install
+#     startCommand: cd server && node index.js
+#     healthCheckPath: /api/health
+#     envVars:
+#       - key: NODE_VERSION
+#         value: 22.22.2
+#       - key: FRONTEND_URL
+#         value: https://loadbyton-demo.onrender.com
