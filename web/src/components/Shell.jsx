@@ -40,7 +40,7 @@ export function Shell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const navItems = user ? (NAV_BY_ROLE[user.role] || []).filter((i) => !i.hidden) : [];
-  const { addToast } = useToasts();
+  const { toasts, addToast, removeToast } = useToasts();
 
   async function handleLogout() {
     await logout();
@@ -177,6 +177,16 @@ export function Shell({ children }) {
       )}
 
       <main className="flex-1">{children}</main>
+
+      <div className="toast-container" role="region" aria-label="Notifications">
+        {toasts?.map((toast) => (
+          <Toast
+            key={toast.id}
+            toast={toast}
+            onRemove={removeToast}
+          />
+        ))}
+      </div>
 
       <footer className="border-t" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page flex flex-col gap-6 py-10 sm:flex-row sm:items-center sm:justify-between">

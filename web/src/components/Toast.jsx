@@ -1,4 +1,8 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+
+function cx(...parts) {
+  return parts.filter(Boolean).join(' ');
+}
 
 const toastTypes = {
   award: { icon: 'Gavel', color: 'var(--brand-accent)' },
@@ -11,31 +15,26 @@ const toastTypes = {
   system_message: { icon: 'Help', color: 'var(--lb-purple-600)' },
 };
 
-function Toast({ type, title, body, timeout = 5000, onAction }) {
-  const [show, setShow] = useState(false);
+function Toast({ toast, onRemove }) {
+  const [visible, setVisible] = useState(false);
   const [entered, setEntered] = useState(false);
   const toastRef = useRef(null);
 
   useEffect(() => {
-    if (!show) return;
-    const id = setTimeout(() => setShow(false), timeout);
+    setVisible(true);
+    const id = setTimeout(() => {
+      setVisible(false);
+      setTimeout(() => onRemove(toast.id), 300);
+    }, toast.timeout || 5000);
     return () => clearTimeout(id);
-  }, [show, timeout]);
+  }, [toast, onRemove]);
 
   const handleMouseEnter = () => setEntered(true);
   const handleMouseLeave = () => setEntered(false);
 
-  const timeoutDuration = entered ? 10000 : timeout;
+  if (!visible) return null;
 
-  useEffect(() => {
-    if (!show) return;
-    const id = setTimeout(() => setShow(false), timeoutDuration);
-    return () => clearTimeout(id);
-  }, [show, entered, timeoutDuration]);
-
-  if (!show) return null;
-
-  const typeConfig = toastTypes[type] || toastTypes.system_message;
+  const typeConfig = toastTypes[toast.type] || toastTypes.system_message;
   const iconComponent = typeConfig.icon;
 
   return (
@@ -44,14 +43,14 @@ function Toast({ type, title, body, timeout = 5000, onAction }) {
       className={cx(
         'toast',
         {
-          'toast--award': type === 'award',
-          'toast--bid-received': type === 'bid_received',
-          'toast--status-change': type === 'status_change',
-          'toast--payout-released': type === 'payout_released',
-          'toast--dispute-opened': type === 'dispute_opened',
-          'toast--dispute-resolved': type === 'dispute_resolved',
-          'toast--carrier-verified': type === 'carrier_verified',
-          'toast--system-message': type === 'system_message',
+          'toast--award': toast.type === 'award',
+          'toast--bid-received': toast.type === 'bid_received',
+          'toast--status-change': toast.type === 'status_change',
+          'toast--payout-released': toast.type === 'payout_released',
+          'toast--dispute-opened': toast.type === 'dispute_opened',
+          'toast--dispute-resolved': toast.type === 'dispute_resolved',
+          'toast--carrier-verified': toast.type === 'carrier_verified',
+          'toast--system-message': toast.type === 'system_message',
         }
       )}
       onMouseEnter={handleMouseEnter}
@@ -63,16 +62,16 @@ function Toast({ type, title, body, timeout = 5000, onAction }) {
         </svg>
       </div>
       <div className="message">
-        <div className="font-medium">{title}</div>
-        <div className="text-ink-muted">{body}</div>
+        <div className="font-medium">{toast.title}</div>
+        <div className="text-ink-muted">{toast.body}</div>
       </div>
       <button
         className="action"
-        onClick={() => onAction && onAction()}
-        aria-label="Extend toast duration"
+        onClick={() => onRemove(toast.id)}
+        aria-label="Dismiss toast"
       >
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M15 18l-3-3a2.5 2.5 0 0 0-1.75-1.25H7.5q-.5 0-.75.25L4 15l2.5 2.25q-.15.3-.15.65v1q0 .3.15.65l3 3a2.5 2.5 0 0 0 1.75 1.25h5q.5 0 .75-.25l3-3a2.5 2.5 0 0 0 0-2.5H16z" />
+          <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </button>
     </div>
