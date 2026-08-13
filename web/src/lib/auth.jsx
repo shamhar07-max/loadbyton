@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
     return d.user;
   }, []);
 
-  const setWalkthroughStep = useCallback((step: number) => {
+  const setWalkthroughStep = useCallback((step) => {
     localStorage.setItem('loadbyton-walkthrough', String(step));
   }, []);
 
