@@ -529,7 +529,7 @@ function RegistrationsTab() {
                   </td>
                   <td className="px-5 py-3">
                     <Button variant="ghost" size="sm">Activate</Button>
-                    <Button variant="ghost" size="sm" variant="danger">Deactivate</Button>
+                    <Button variant="danger" size="sm">Deactivate</Button>
                   </td>
                 </tr>
               ))}
