@@ -62,7 +62,7 @@ export default function App() {
         <Route path="/register" element={<GuestOnly><Register /></GuestOnly>} />
 
         <Route path="/dashboard" element={<RequireAuth roles={['SHIPPER']}><Dashboard /></RequireAuth>} />
-        <Route path"/templates" element={<RequireAuth roles={['SHIPPER']}><Templates /></RequireAuth>} />
+        <Route path="/templates" element={<RequireAuth roles={['SHIPPER']}><Templates /></RequireAuth>} />
         <Route path="/contracts" element={<RequireAuth roles={['SHIPPER']}><Contracts /></RequireAuth>} />
 
         <Route path="/open-loads" element={<RequireAuth roles={['CARRIER']}><OpenLoads /></RequireAuth>} />
