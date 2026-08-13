@@ -92,7 +92,7 @@ export default function OpenLoads() {
                         >Bid <IconChevronRight size={14} />
                       </Button>
                     ) : (
-                      Bid <IconChevronRight size={14} />
+                      <>Bid <IconChevronRight size={14} /></>
                     )}
                   </span>
                 </div>
