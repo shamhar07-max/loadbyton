@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, roleHome } from '../lib/auth.jsx';
-import { IconMenu, IconClose, IconBell, IconLogOut, IconUser } from './icons.jsx';
+import { IconMenu, IconClose, IconBell, IconLogOut, IconUser, IconMoon, IconSun } from './icons.jsx';
+import { useToasts } from './Toast.jsx';
 
 export function Logo({ dark = false, className = '' }) {
   return (
@@ -19,10 +20,11 @@ const NAV_BY_ROLE = {
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/templates', label: 'Templates' },
     { to: '/contracts', label: 'Contract lanes' },
-    { to: '/earnings-or-spend', label: 'Analytics', hidden: true },
   ],
   CARRIER: [
     { to: '/open-loads', label: 'Open loads' },
+    { to: '/my-bids', label: 'My bids' },
+    { to: '/won-jobs', label: 'Won jobs' },
     { to: '/earnings', label: 'Earnings' },
   ],
   ADMIN: [
@@ -31,44 +33,81 @@ const NAV_BY_ROLE = {
 };
 
 export function Shell({ children }) {
-  const { user, logout } = useAuth();
+  const { user, logout, theme, setTheme, walkthroughFinished, walkthroughStep, completeWalkthrough, setWalkthroughStep, endImpersonation } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const navItems = user ? (NAV_BY_ROLE[user.role] || []).filter((i) => !i.hidden) : [];
+  const [endingImpersonation, setEndingImpersonation] = useState(false);
+  const navItems = user ? NAV_BY_ROLE[user.role] || [] : [];
+  const { addToast } = useToasts();
 
   async function handleLogout() {
     await logout();
     navigate('/');
+    addToast({
+      type: 'system_message',
+      title: 'Session ended',
+      body: 'You have been logged out.',
+    });
+  }
+
+  async function handleEndImpersonation() {
+    setEndingImpersonation(true);
+    try {
+      await endImpersonation();
+      navigate('/admin');
+    } finally {
+      setEndingImpersonation(false);
+    }
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
+      {user?.impersonating && (
+        <div className="flex items-center justify-center gap-3 px-4 py-2 text-sm font-medium text-white" style={{ background: 'var(--status-danger)' }}>
+          <span>Impersonating {user.profile?.company_name || user.email} — actions here are logged to the audit trail.</span>
+          <button onClick={handleEndImpersonation} disabled={endingImpersonation} className="rounded-md border border-white/40 px-2.5 py-1 text-xs font-semibold hover:bg-white/10">
+            {endingImpersonation ? 'Returning…' : 'Return to admin'}
+          </button>
+        </div>
+      )}
       <header className="sticky top-0 z-40 border-b bg-surface/95 backdrop-blur" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page flex h-16 items-center justify-between">
           <div className="flex items-center gap-8">
             <Logo />
             <nav className="hidden items-center gap-1 md:flex">
               {navItems.map((item) => (
-                <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>
+                <NavLink key={item.label} to={item.to} className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>
                   {item.label}
                 </NavLink>
               ))}
               {!user && (
                 <>
-                  <NavLink to="/features" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>Features</NavLink>
-                  <NavLink to="/pricing" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>Pricing</NavLink>
-                  <NavLink to="/about" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>About</NavLink>
+                  <NavLink key="features" to="/features" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>Features</NavLink>
+                  <NavLink key="pricing" to="/pricing" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>Pricing</NavLink>
+                  <NavLink key="about" to="/about" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>About</NavLink>
                 </>
               )}
             </nav>
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="nav-link"
+              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            >
+              {theme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+            </button>
             {user ? (
               <>
                 <Link to="/notifications" className="nav-link relative" aria-label="Notifications">
                   <IconBell size={19} />
+                  {user.unreadNotifications > 0 && (
+                    <span className="absolute -top-1 right-1 bg-brand-primary text-white text-xs rounded-full w-3 h-3">{user.unreadNotifications}</span>
+                  )}
                 </Link>
                 <div className="relative">
                   <button onClick={() => setMenuOpen((v) => !v)} className="nav-link flex items-center gap-2" aria-haspopup="true" aria-expanded={menuOpen}>
@@ -89,7 +128,7 @@ export function Shell({ children }) {
                       <Link to={roleHome(user.role)} className="block px-4 py-2.5 text-sm text-ink-secondary hover:bg-raised" onClick={() => setMenuOpen(false)}>
                         Dashboard
                       </Link>
-                      <button onClick={handleLogout} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-status-danger hover:bg-raised">
+                      <button onClick={handleLogout} className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-status-danger hover:bg-raised">
                         <IconLogOut size={15} /> Log out
                       </button>
                     </div>
@@ -102,15 +141,21 @@ export function Shell({ children }) {
                 <Link to="/register" className="btn-primary">Get started</Link>
               </>
             )}
+
             <button className="nav-link md:hidden" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">
               {mobileOpen ? <IconClose size={20} /> : <IconMenu size={20} />}
             </button>
           </div>
         </div>
+
         {mobileOpen && (
           <nav className="border-t px-5 py-3 md:hidden" style={{ borderColor: 'var(--border-default)' }}>
             <div className="flex flex-col gap-1">
-              {(user ? navItems : [{ to: '/features', label: 'Features' }, { to: '/pricing', label: 'Pricing' }, { to: '/about', label: 'About' }]).map((item) => (
+              {(user ? navItems : [
+                { to: '/features', label: 'Features' },
+                { to: '/pricing', label: 'Pricing' },
+                { to: '/about', label: 'About' }
+              ]).map((item) => (
                 <NavLink key={item.to} to={item.to} className="nav-link" onClick={() => setMobileOpen(false)}>
                   {item.label}
                 </NavLink>
@@ -120,11 +165,15 @@ export function Shell({ children }) {
         )}
       </header>
 
+      {user && !walkthroughFinished && (
+        <WalkthroughModal step={walkthroughStep} onStep={setWalkthroughStep} onFinish={completeWalkthrough} />
+      )}
+
       <main className="flex-1">{children}</main>
 
       <footer className="border-t" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page flex flex-col gap-6 py-10 sm:flex-row sm:items-center sm:justify-between">
-          <Logo />
+          <Logo dark />
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-muted">
             <Link to="/features" className="hover:text-ink">Features</Link>
             <Link to="/pricing" className="hover:text-ink">Pricing</Link>
@@ -134,6 +183,46 @@ export function Shell({ children }) {
           <p className="text-xs text-ink-muted">© {new Date().getFullYear()} Loadbyton. Demo system — payouts are simulated, not real transfers.</p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+const WALKTHROUGH_STEPS = [
+  { title: 'Post your first requirement', body: 'Create a job post that verified carriers can bid on.', cta: "Let's start" },
+  { title: 'Review carrier bids', body: 'Compare price, ETA, and ratings from competing carriers.', cta: 'Next' },
+  { title: 'Award and track', body: 'Accept a bid, mark status updates, and release payouts.', cta: 'Got it' },
+];
+
+function WalkthroughModal({ step, onStep, onFinish }) {
+  const current = WALKTHROUGH_STEPS[Math.min(step, WALKTHROUGH_STEPS.length - 1)];
+  const isLast = step >= WALKTHROUGH_STEPS.length - 1;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-label="Welcome walkthrough">
+      <div className="w-full max-w-md rounded-lg border bg-surface p-8 shadow-2xl" style={{ borderColor: 'var(--border-default)' }}>
+        <h2 className="font-display text-xl font-semibold text-ink">Welcome to Loadbyton</h2>
+        <p className="mt-1 mb-6 text-sm text-ink-muted">Step {step + 1} of {WALKTHROUGH_STEPS.length}</p>
+
+        <div className="mb-1 flex gap-1.5">
+          {WALKTHROUGH_STEPS.map((_, i) => (
+            <span key={i} className="h-1 flex-1 rounded-full" style={{ background: i <= step ? 'var(--brand-accent)' : 'var(--border-default)' }} />
+          ))}
+        </div>
+
+        <div className="mt-6">
+          <h3 className="font-medium text-ink">{current.title}</h3>
+          <p className="mt-1 text-sm text-ink-muted">{current.body}</p>
+          <button onClick={() => (isLast ? onFinish() : onStep(step + 1))} className="btn-accent w-full mt-4">
+            {current.cta}
+          </button>
+        </div>
+
+        <div className="mt-6 border-t pt-4 text-center" style={{ borderColor: 'var(--border-subtle)' }}>
+          <button onClick={onFinish} className="text-xs font-medium text-ink-muted hover:text-ink">
+            Skip — don't show this again
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

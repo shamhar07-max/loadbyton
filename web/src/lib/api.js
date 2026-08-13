@@ -50,6 +50,8 @@ export const api = {
     return get(`/jobs${suffix}`);
   },
   createJob: (body) => post('/jobs', body),
+  myBids: () => get('/bids/mine'),
+  withdrawBid: (id) => post(`/bids/${id}/withdraw`),
   getJob: (id) => get(`/jobs/${id}`),
   placeBid: (id, body) => post(`/jobs/${id}/bids`, body),
   rateEstimate: (id, body) => post(`/jobs/${id}/rate`, body),
@@ -87,5 +89,9 @@ export const api = {
   adminRevenue: () => get('/admin/revenue'),
   adminGetSettings: () => get('/admin/settings'),
   adminUpdateSettings: (body) => patch('/admin/settings', body),
+  adminUsers: () => get('/admin/users'),
+  adminReferrals: () => get('/admin/referrals'),
+  adminImpersonate: (userId) => post(`/admin/impersonate/${userId}`),
+  endImpersonation: () => post('/admin/impersonate/end'),
   runAutoRelease: () => post('/system/auto-release'),
 };

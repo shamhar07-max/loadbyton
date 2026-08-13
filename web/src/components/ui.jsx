@@ -12,11 +12,14 @@ const BUTTON_VARIANTS = {
   ghost: 'btn-ghost',
   danger: 'btn-danger',
   outline: 'btn-secondary',
+  success: 'btn-success',
+  link: 'btn-link',
 };
+const BUTTON_SIZES = { sm: 'btn-sm', md: '', lg: 'btn-lg' };
 
-export function Button({ variant = 'primary', className, children, loading, ...props }) {
+export function Button({ variant = 'primary', size = 'md', className, children, loading, ...props }) {
   return (
-    <button className={cx(BUTTON_VARIANTS[variant] || BUTTON_VARIANTS.primary, className)} disabled={loading || props.disabled} {...props}>
+    <button className={cx(BUTTON_VARIANTS[variant] || BUTTON_VARIANTS.primary, BUTTON_SIZES[size], className)} disabled={loading || props.disabled} {...props}>
       {loading && <Spinner size={14} />}
       {children}
     </button>
@@ -107,11 +110,11 @@ export const Input = React.forwardRef(function Input({ className, ...props }, re
   return <input ref={ref} className={cx('input', className)} {...props} />;
 });
 export const Textarea = React.forwardRef(function Textarea({ className, ...props }, ref) {
-  return <textarea ref={ref} className={cx('input', className)} {...props} />;
+  return <textarea ref={ref} className={cx('textarea', className)} {...props} />;
 });
 export const Select = React.forwardRef(function Select({ className, children, ...props }, ref) {
   return (
-    <select ref={ref} className={cx('input', className)} {...props}>
+    <select ref={ref} className={cx('select', className)} {...props}>
       {children}
     </select>
   );

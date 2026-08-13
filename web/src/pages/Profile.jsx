@@ -6,7 +6,7 @@ import { Button, Card, Input, Label } from '../components/ui.jsx';
 
 export default function Profile() {
   usePageTitle('Profile & settings');
-  const { user, refresh } = useAuth();
+  const { user, refresh, restartWalkthrough } = useAuth();
   const [form, setForm] = useState({
     companyName: user.profile?.company_name || '',
     phone: user.profile?.phone || '',
@@ -125,6 +125,16 @@ export default function Profile() {
               <Button variant="secondary" onClick={setupMfa} loading={mfaBusy}>Enable MFA</Button>
             </div>
           )}
+        </Card.Content>
+      </Card>
+
+      <Card className="mt-6">
+        <Card.Header><Card.Title>Walkthrough</Card.Title></Card.Header>
+        <Card.Content>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-ink-secondary">Replay the 3-step welcome walkthrough.</p>
+            <Button variant="secondary" onClick={restartWalkthrough}>Start over</Button>
+          </div>
         </Card.Content>
       </Card>
     </div>

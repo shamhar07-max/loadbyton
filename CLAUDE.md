@@ -105,3 +105,32 @@ There's no automated test suite yet (`TODOS.md` TODO-1). To check a change:
 3. Walk the relevant part of `docs/TUTORIAL.md` against the live API (curl or the UI)
    for anything touching auth, jobs, bids, award, status, escrow, or admin routes.
 4. `cd web && npm run build` must succeed cleanly before calling a frontend change done.
+
+## Toasts, the walkthrough, and localStorage-as-state
+
+- `useToasts()` (`web/src/components/Toast.jsx`) only works because a single
+  `ToastProvider` wraps the app in `main.jsx` and owns the one `toasts` array —
+  every page that calls `useToasts()` reads/writes that same context. **Never**
+  call `useState` to build a second, parallel toast list in a page component;
+  that was a real bug here (each page got its own invisible toast queue that
+  nothing rendered) before this was made a proper Context.
+- Anything that needs to survive a re-render and actually update the screen —
+  the walkthrough step, "is the walkthrough finished," the impersonation banner
+  — must be `useState` (optionally mirrored to `localStorage` in a `useEffect`,
+  the way `theme` already does it in `web/src/lib/auth.jsx`). Reading/writing
+  `localStorage` directly with no backing state compiles fine and does nothing
+  visible: React has no reason to re-render, so a modal gated on that value can
+  get stuck open indefinitely. That was a real bug here too.
+- Job/bid `status` values from the API are **always uppercase**
+  (`OPEN`, `AWARDED`, `PENDING`, `ACCEPTED`, …) — never introduce a filter,
+  badge-color map, or conditional that compares against a lowercase literal
+  (`'open'`, `'won'`). Several pages shipped with exactly that mismatch, which
+  doesn't error — it just silently matches nothing, so the control looks real
+  but never does anything.
+
+## Known rough edges
+
+- No automated test suite yet — `TODOS.md` TODO-1 tracks building an isolated fresh-seed-per-run harness.
+- The in-process auto-release sweep requires at least one API request cadence.
+- Driver identity isn't yet bound to the bid (`bids.driver_name` is free text) — see TODO-2.
+- Payout release is a manual, founder-executed step with no enforced SLA tracker yet — see TODO-3.

@@ -141,12 +141,17 @@ function canViewJob(job, user) {
 // Auth: sessions, not JWTs. lb_session HttpOnly cookie -> sessions table.
 // ---------------------------------------------------------------------------
 
-function createSession(req, res, userId) {
+function createSession(req, res, userId, { impersonatingAdminId = null, maxAgeSeconds = 7 * 24 * 60 * 60 } = {}) {
   const token = randomToken(32);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  db.prepare('INSERT INTO sessions (session_token, user_id, expires_at) VALUES (?,?,?)').run(token, userId, expiresAt);
+  const expiresAt = new Date(Date.now() + maxAgeSeconds * 1000).toISOString();
+  db.prepare('INSERT INTO sessions (session_token, user_id, expires_at, impersonating_admin_id) VALUES (?,?,?,?)').run(
+    token,
+    userId,
+    expiresAt,
+    impersonatingAdminId
+  );
   const secure = req.protocol === 'https' ? '; Secure' : '';
-  res.setHeader('Set-Cookie', `lb_session=${token}; HttpOnly; Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax${secure}`);
+  res.setHeader('Set-Cookie', `lb_session=${token}; HttpOnly; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`);
 }
 
 function clearSessionCookie(res) {
@@ -163,6 +168,7 @@ function auth(roles) {
     if (!user) return sendError(res, 401, 'Not authenticated');
     const profile = db.prepare('SELECT * FROM profiles WHERE user_id=?').get(user.id);
     req.user = { ...user, profile };
+    req.session = session;
     if (roles && roles.length && !roles.includes(user.role)) return sendError(res, 403, 'Not permitted for this role');
     next();
   };
@@ -323,7 +329,11 @@ app.post(
 );
 
 app.get('/api/auth/me', auth(), (req, res) => {
-  res.json({ user: toPublicUser(req.user) });
+  const impersonatingAdminId = req.session.impersonating_admin_id;
+  const impersonatedBy = impersonatingAdminId
+    ? db.prepare('SELECT id, email FROM users WHERE id=?').get(impersonatingAdminId)
+    : null;
+  res.json({ user: { ...toPublicUser(req.user), impersonating: !!impersonatedBy, impersonatedBy } });
 });
 
 app.post('/api/auth/logout', auth(), (req, res) => {
@@ -426,6 +436,29 @@ app.get('/api/public/market', (req, res) => {
 // =============================================================================
 // 4. Jobs & the marketplace
 // =============================================================================
+
+app.get('/api/bids/mine', auth(['CARRIER']), (req, res) => {
+  const bids = db
+    .prepare(
+      `SELECT b.*, j.job_code, j.pickup_terminal, j.delivery_area, j.status as job_status
+       FROM bids b JOIN jobs j ON j.id = b.job_id
+       WHERE b.carrier_id = ?
+       ORDER BY b.created_at DESC`
+    )
+    .all(req.user.id);
+  res.json({ bids });
+});
+
+app.post('/api/bids/:id/withdraw', auth(['CARRIER']), (req, res) => {
+  const bid = db.prepare('SELECT * FROM bids WHERE id=?').get(req.params.id);
+  if (!bid) return sendError(res, 404, 'Bid not found');
+  if (bid.carrier_id !== req.user.id) return sendError(res, 403, 'Not your bid');
+  if (bid.status !== 'PENDING') return sendError(res, 400, 'Only a pending bid can be withdrawn');
+  db.prepare(`UPDATE bids SET status='WITHDRAWN', updated_at=datetime('now') WHERE id=?`).run(bid.id);
+  writeAudit(req, { userId: req.user.id, action: 'BID_WITHDRAW', details: `Withdrew bid #${bid.id}`, entityType: 'bid', entityId: bid.id, beforeState: 'PENDING', afterState: 'WITHDRAWN' });
+  const updated = db.prepare('SELECT * FROM bids WHERE id=?').get(bid.id);
+  res.json({ ok: true, bid: updated });
+});
 
 app.get('/api/jobs', auth(), (req, res) => {
   const { status, limit, offset } = req.query;
@@ -921,7 +954,7 @@ app.get('/api/analytics/mine', auth(), (req, res) => {
 app.get('/api/earnings', auth(['CARRIER']), (req, res) => {
   const rows = db
     .prepare(
-      `SELECT j.job_code, j.status, j.agreed_price_aed, j.created_at as job_created,
+      `SELECT p.id, j.id as job_id, j.job_code, j.status, j.agreed_price_aed, j.created_at as job_created,
               p.gross_aed, p.platform_fee_aed, p.net_aed, p.status as payout_status, p.release_type, p.released_at
        FROM payouts p JOIN jobs j ON j.id = p.job_id
        WHERE p.carrier_id = ?
@@ -1015,6 +1048,97 @@ app.post('/api/admin/verify/:id', auth(['ADMIN']), (req, res) => {
   }
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(carrier.id);
   res.json({ ok: true, user: toPublicUser(user) });
+});
+
+app.get('/api/admin/users', auth(['ADMIN']), (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT u.*, p.company_name, p.completed_jobs, p.rating_avg
+       FROM users u LEFT JOIN profiles p ON p.user_id = u.id
+       ORDER BY u.created_at DESC`
+    )
+    .all();
+  res.json({
+    users: rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      role: r.role,
+      is_verified: !!r.is_verified,
+      tier: r.tier,
+      created_at: r.created_at,
+      profile: { company_name: r.company_name, completed_jobs: r.completed_jobs, rating_avg: r.rating_avg },
+    })),
+  });
+});
+
+app.get('/api/admin/referrals', auth(['ADMIN']), (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT referred.id, referred.email, referred.created_at, referred.referred_by,
+              referrer.id AS referrer_id, referrer.email AS referrer_email, referrerProfile.company_name AS referrer_company,
+              referredProfile.fleet_size AS fleet_size,
+              (SELECT COUNT(*) FROM jobs WHERE (jobs.shipper_id = referred.id OR jobs.carrier_id = referred.id) AND jobs.status = 'COMPLETED') AS referred_completed_jobs
+       FROM users referred
+       JOIN users referrer ON referrer.referral_code = referred.referred_by
+       LEFT JOIN profiles referrerProfile ON referrerProfile.user_id = referrer.id
+       LEFT JOIN profiles referredProfile ON referredProfile.user_id = referred.id
+       WHERE referred.referred_by IS NOT NULL
+       ORDER BY referred.created_at DESC`
+    )
+    .all();
+  res.json({
+    referrals: rows.map((r) => ({
+      referredUserId: r.id,
+      referredEmail: r.email,
+      referredAt: r.created_at,
+      referralCode: r.referred_by,
+      referrerId: r.referrer_id,
+      referrerEmail: r.referrer_email,
+      referrerCompany: r.referrer_company,
+      fleetSize: r.fleet_size,
+      // Bonus only actually credits once the referred account completes a job —
+      // status here reflects that, it isn't a stored/toggleable flag.
+      status: r.referred_completed_jobs > 0 ? 'CREDITED' : 'PENDING',
+    })),
+  });
+});
+
+// NOTE: the literal `/impersonate/end` route MUST be registered before the
+// parameterized `/impersonate/:userId` route below — Express matches routes
+// in registration order, and `:userId` would otherwise greedily match the
+// literal string "end" and route every "end impersonation" call into the
+// admin-only start handler instead (a real bug caught in testing: it 403'd
+// with "Not permitted for this role" because the impersonated session isn't
+// an admin session).
+app.post('/api/admin/impersonate/end', auth(), (req, res) => {
+  const adminId = req.session.impersonating_admin_id;
+  if (!adminId) return sendError(res, 400, 'Not currently impersonating');
+  const admin = db.prepare('SELECT * FROM users WHERE id=?').get(adminId);
+  if (!admin) return sendError(res, 404, 'Original admin account not found');
+  createSession(req, res, admin.id);
+  writeAudit(req, {
+    userId: adminId,
+    action: 'IMPERSONATE_END',
+    details: `Admin ${admin.email} ended impersonation of ${req.user.email} (#${req.user.id})`,
+    entityType: 'user',
+    entityId: req.user.id,
+  });
+  res.json({ ok: true, user: toPublicUser(admin) });
+});
+
+app.post('/api/admin/impersonate/:userId', auth(['ADMIN']), (req, res) => {
+  const target = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.userId);
+  if (!target) return sendError(res, 404, 'User not found');
+  if (target.role === 'ADMIN') return sendError(res, 400, 'Cannot impersonate another admin');
+  createSession(req, res, target.id, { impersonatingAdminId: req.user.id, maxAgeSeconds: 30 * 60 });
+  writeAudit(req, {
+    userId: req.user.id,
+    action: 'IMPERSONATE_START',
+    details: `Admin ${req.user.email} started impersonating ${target.email} (#${target.id})`,
+    entityType: 'user',
+    entityId: target.id,
+  });
+  res.json({ ok: true, user: toPublicUser(target) });
 });
 
 app.post('/api/admin/confirm-receipt', auth(['ADMIN']), (req, res) => {

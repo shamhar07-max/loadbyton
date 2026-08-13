@@ -245,6 +245,8 @@ addColumn('jobs', 'container_count', 'container_count INTEGER NOT NULL DEFAULT 1
 addColumn('jobs', 'truck_count', 'truck_count INTEGER NOT NULL DEFAULT 1');
 addColumn('jobs', 'equipment_type', "equipment_type TEXT NOT NULL DEFAULT 'CONTAINER_CHASSIS'");
 
+addColumn('sessions', 'impersonating_admin_id', 'impersonating_admin_id INTEGER');
+
 addColumn('payouts', 'release_type', 'release_type TEXT');
 
 addColumn('audit_log', 'entity_type', 'entity_type TEXT');

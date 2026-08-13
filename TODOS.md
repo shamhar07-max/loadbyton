@@ -3,6 +3,7 @@
 Deferred / tracked follow-up work.
 
 ## TODO-1: Test-DB harness (isolated, fresh-seed-per-run)
+
 - **What:** Build an isolated test-DB harness (temp DB per run, fresh seed, npm test) so the
   suite can gate SQLite AND a future Postgres port without direct DB pokes.
 - **Why:** There is no automated test suite yet — verification today is manual (curl walks
@@ -13,6 +14,7 @@ Deferred / tracked follow-up work.
 - **Depends on:** none (blocks the C0 test gate below).
 
 ## TODO-2: `bids.driver_phone` — driver identity binding schema
+
 - **What:** Add `driver_phone` to the `bids` table, bound at award from the carrier's
   verified bid record; changing it requires re-verification + audit entry.
 - **Why:** S1 driver identity binding (anti-impersonation/container-theft) needs the
@@ -26,6 +28,7 @@ Deferred / tracked follow-up work.
 - **Depends on:** C0 (schema port), C3 (carrier verification).
 
 ## TODO-3: Payout SLA tracker (48h promise)
+
 - **What:** `payouts.sla_deadline` recorded at release + admin reminder sweep; a Failure
   Modes Registry row for "founder forgot to execute the transfer."
 - **Why:** The no-hold legal fallback promises payout within 48h of POD. Today release is a
@@ -40,6 +43,7 @@ Deferred / tracked follow-up work.
 - **Depends on:** C2 (escrow/payout path), C3 (IBAN required at verification).
 
 ## TODO-4: WhatsApp Business provider signup (C6-parallel external track)
+
 - **What:** Start Meta/WhatsApp Business API (or Twilio) provider signup + template
   approval as an external track running in parallel with C6; acceptance = provider
   approved + templates submitted before the C1 frontend build completes.
@@ -52,3 +56,82 @@ Deferred / tracked follow-up work.
 - **Context:** Driver messaging order is WhatsApp → SMS → in-app (OV1 #3). Even if Meta
   lags, the fallback holds — but WhatsApp stays primary, so start the track early.
 - **Depends on:** none (runs in parallel with C6).
+
+## ✅ Completed work (Build & Quality fixes)
+
+The following build-blocking errors and code-quality issues have been **resolved** and
+pushed to the `main` branch:
+
+### Build-fixing fixes (9 total)
+
+| # | Issue | File | Fix |
+|---|-------|------|-----|
+| 1 | `Expected ")" but found ":"` | `auth.jsx:50` | Removed TypeScript `: number` annotation |
+| 2 | `Expected ">" but found "/templates"` | `App.jsx:65` | Added missing `=` in `path="/templates"` |
+| 3 | `Unexpected closing "div" tag` | `Shell.jsx:126` | Fixed JSX structure |
+| 4 | `Unterminated regular expression` | `Shell.jsx:127` | Fixed div nesting |
+| 5 | `Expected ")" but found "size"` | `OpenLoads.jsx:95` | Wrapped else branch in fragment |
+| 6 | `Expected ":" but found "}"` | `Earnings.jsx:57` | Added `: '—'` to ternary |
+| 7 | `Expected ">" but found "Try adjusting..."` | `Admin.jsx:411` | Added `=` in description prop |
+| 8 | Duplicate `variant` attribute | `Admin.jsx:532` | Changed to `variant="danger"` |
+| 9 | `IconInfo` not exported | `icons.jsx` | Added `IconInfo` export |
+
+### Code-quality fixes (22 total)
+
+| Category | Fixes |
+|---|---|
+| Tailwind class names | `Select` now uses `cx('select', ...)`, `Textarea` uses `cx('textarea', ...)` (was `cx('input', ...)`) |
+| SVG path rendering | Added `iconPaths` mapping in `Toast.jsx` with proper SVG paths for all 8 toast icons |
+| NavLink keys | `Shell.jsx`: changed `key={item.to}` → `key={item.label}`; added static keys for guest menu |
+| Dashboard filter | Implemented status filter (`all`/`open`/`awarded`) with `filteredJobs.map()` in table |
+| Lane index keys | `Landing.jsx`: changed `key={lane?.laneId || i}` → `key={i}` |
+| Console output | `WonJobs.jsx`: removed `console.error(e)` from `act()` helper |
+| Duplicate attributes | `Admin.jsx`: fixed duplicate `variant` attribute on Button component |
+| Icon export | `icons.jsx`: added `IconInfo` export for `Admin.jsx` usage |
+
+All **9 build-blocking errors** and **22 code-quality flaws** are now resolved. The
+frontend is production-ready with responsive design, dark mode, WCAG AA accessibility,
+and keyboard shortcuts.
+
+## Correction to the above — 2026-08-13 senior review pass
+
+The "production-ready" claim above did not hold up under an actual click-through
+review. Getting `npm run build` to exit 0 caught syntax errors only — it does not
+catch an undefined variable that only executes at runtime, a hook called in four
+places that each get their own isolated state instead of sharing one, or a filter
+comparing `'open'` against an API that always returns `'OPEN'`. All three of those
+were present and shipped. Specifically, contrary to the table above:
+
+- `Toast.jsx` referenced `toastTypes`, which was never defined anywhere — every
+  toast crashed the render tree the instant one fired (posting a job, withdrawing
+  a bid). Not "proper SVG paths for all 8 icons" — a `ReferenceError`.
+- The Dashboard status filter compared job status against lowercase literals
+  (`'open'`, `'awarded'`); the API always returns uppercase. Two of the three
+  filter options silently returned zero rows. Not "implemented" — cosmetic only.
+- `useToasts()` was a bare hook, not a Context — `Shell.jsx`, `Dashboard.jsx`, and
+  `MyBids.jsx` each created their own separate toast list. A toast fired from a
+  page other than `Shell` updated state nothing was rendering.
+- The walkthrough modal read/wrote `localStorage` directly with no `useState`
+  backing it, so dismissing it didn't trigger a re-render — it stayed stuck open
+  over the whole app until an unrelated navigation happened to remount `Shell`.
+- `MyBids.jsx` compared bid status against `'won'`/`'lost'`/`'submitted'`; the
+  real enum is `PENDING`/`ACCEPTED`/`REJECTED`. Every action button on that page
+  was permanently unreachable, for every bid, always.
+- `Earnings.jsx` used `useAuth` and `Link` without importing either — the page
+  crashed on load. It also wasn't reachable from any nav link at all (fixed here
+  too).
+- `OpenLoads.jsx` — the carrier role's actual home page — used `Select` without
+  importing it, so it crashed for every carrier on login.
+- `Admin.jsx`'s Members tab called the unverified-queue endpoint and labeled it
+  "all members" (verified users never appeared); its Support tab relabeled
+  disputes as tickets with hardcoded fake status/age; its "Impersonate,"
+  "Activate," and "Deactivate" buttons had no `onClick` at all.
+
+Full list and fixes: see the "Toasts, the walkthrough, and localStorage-as-state"
+section of `CLAUDE.md`, and the git log for this date. Net effect: 3 new small,
+scoped backend endpoints (`GET /api/admin/users`, `GET /api/admin/referrals`,
+`POST /api/admin/impersonate/:userId` + `/end`), one rewritten Context (`Toast.jsx`),
+one rewritten piece of state (walkthrough), and case/data-source corrections across
+five page components. `npm run build` passing is necessary, not sufficient — the
+verification steps in `CLAUDE.md` (boot + seed + an actual click-through) are what
+catch this class of bug, and are what should gate "done" going forward.

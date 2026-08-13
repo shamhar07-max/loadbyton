@@ -38,3 +38,6 @@ export const IconTag = (p) => <Icon {...p}><path d="M12.6 2H4a2 2 0 0 0-2 2v8.6a
 export const IconTrailer = (p) => <Icon {...p}><path d="M2 8h13v8H2z" /><path d="M15 12h4l3 2v2h-7z" /><circle cx="6" cy="18" r="1.6" /><circle cx="18.5" cy="18" r="1.6" /><path d="M2 8V6h9v2" /></Icon>;
 export const IconLayers = (p) => <Icon {...p}><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></Icon>;
 export const IconCompass = (p) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="m15 9-2 6-6 2 2-6 6-2Z" /></Icon>;
+export const IconInfo = (p) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></Icon>;
+export const IconX = (p) => <Icon {...p}><path d="M18 6 6 18M6 6l12 12" /></Icon>;
+export const IconDownload = (p) => <Icon {...p}><path d="M12 3v12m0 0-4-4m4 4 4-4" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></Icon>;

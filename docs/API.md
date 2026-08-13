@@ -60,10 +60,12 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
       "profile": { "company_name": "...", "trn_number": "...", "trade_license_number": "...",
                    "phone": "...", "iban": "...", "coverage_zones": "...", "fleet_size": 42,
                    "owned_chassis": 30, "insurance_uploaded": 1, "rating_avg": 4.85,
-                   "completed_jobs": 320, "verified_at": "..." }
+                   "completed_jobs": 320, "verified_at": "..." },
+      "impersonating": false, "impersonatedBy": null
     }
   }
   ```
+  `impersonating`/`impersonatedBy` reflect the *current session*, not the user row — see `POST /api/admin/impersonate/:userId` in §6.
 
 ### `POST /api/auth/logout`
 - **Auth:** session
@@ -138,6 +140,14 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
 - **Body:** `{ amountAed, etaMinutes (1–600), truckType, driverName, notes }` — `truckType` is free text (stored as-is); the client UI offers the 12 `equipment_type` values as a picklist defaulting to the job's own requirement, but the field isn't server-validated against that enum.
 - **201** `{ bid }`
 - **403** unverified carrier or job not open (`{ "error": "Carrier verification required to bid." }`).
+
+### `GET /api/bids/mine`
+- **Auth:** `CARRIER`
+- **200** `{ bids: [{ ...bid, job_code, pickup_terminal, delivery_area, job_status }] }` — every bid the carrier has ever placed, newest first, pre-joined with the job's lane so the "My bids" page doesn't have to N+1 `GET /api/jobs/:id` per row.
+
+### `POST /api/bids/:id/withdraw`
+- **Auth:** `CARRIER`, own bid, bid `status = PENDING`
+- **200** `{ ok: true, bid }` — sets `bids.status = 'WITHDRAWN'`. **400** if the bid isn't pending (already accepted/rejected). **403** if it isn't the caller's bid.
 
 ### `POST /api/jobs/:id/rate`
 - **Auth:** session (job participant or admin)
@@ -240,6 +250,19 @@ All routes below require `auth(['ADMIN'])`.
 
 ### `POST /api/admin/confirm-receipt`
 - **Body:** `{ jobId }` — moves escrow `HELD → FUNDED` once funds are actually received (audited).
+
+### `GET /api/admin/users`
+- **200** `{ users: [{ id, email, role, is_verified, tier, created_at, profile: { company_name, completed_jobs, rating_avg } }] }` — every user on the platform (not just the unverified queue). The Members tab filters this list client-side by role/verified/search.
+
+### `GET /api/admin/referrals`
+- **200** `{ referrals: [{ referredUserId, referredEmail, referredAt, referralCode, referrerId, referrerEmail, referrerCompany, fleetSize, status }] }` — every account that signed up with a referral code, joined to the referrer. `status` is `PENDING` or `CREDITED` (`CREDITED` once the referred account has a `COMPLETED` job) — it's derived, not a stored/toggleable flag.
+
+### `POST /api/admin/impersonate/:userId`
+- **200** `{ ok: true, user }` — starts impersonating the target (not another admin — **400** if it is). Issues a new, separate session for the target user tagged with the admin's id and capped at 30 minutes, and swaps the caller's cookie to it. Audited as `IMPERSONATE_START`.
+
+### `POST /api/admin/impersonate/end`
+- **Auth:** any session currently impersonating (i.e. `impersonating_admin_id` set on the current session row)
+- **200** `{ ok: true, user }` — restores the original admin's session. **400** if the current session isn't an impersonation. Audited as `IMPERSONATE_END`.
 
 ### `GET /api/admin/audit`
 - **200** `{ entries: [last 100 audit rows] }`

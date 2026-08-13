@@ -3,18 +3,21 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
-import { formatAED, formatDate, formatLabel, CONTAINER_EQUIPMENT, equipmentLabel } from '../lib/constants.js';
-import { Card, EmptyState, Badge } from '../components/ui.jsx';
+import { formatAED, formatDate, formatLabel, CONTAINER_EQUIPMENT, EQUIPMENT_TYPES, equipmentLabel } from '../lib/constants.js';
+import { Card, EmptyState, Badge, Select } from '../components/ui.jsx';
 import { IconAlert, IconMapPin, IconClock, IconChevronRight, IconPackage } from '../components/icons.jsx';
 
 export default function OpenLoads() {
   usePageTitle('Open loads');
   const { user } = useAuth();
   const [jobs, setJobs] = useState(null);
+  const [equipmentFilter, setEquipmentFilter] = useState('all');
 
   useEffect(() => {
     api.listJobs({ status: 'OPEN' }).then((d) => setJobs(d.jobs)).catch(() => setJobs([]));
   }, []);
+
+  const filteredJobs = equipmentFilter === 'all' ? jobs : jobs?.filter((j) => j.equipment_type === equipmentFilter);
 
   return (
     <div className="container-page py-10">
@@ -28,14 +31,21 @@ export default function OpenLoads() {
         </div>
       )}
 
+      <div className="mt-4">
+        <Select value={equipmentFilter} onChange={(e) => setEquipmentFilter(e.target.value)} className="w-auto">
+          <option value="all">Equipment: All</option>
+          {EQUIPMENT_TYPES.map((t) => <option key={t} value={t}>{equipmentLabel(t)}</option>)}
+        </Select>
+      </div>
+
       <div className="mt-8">
-        {jobs === null ? (
+        {filteredJobs === null ? (
           <p className="text-sm text-ink-muted">Loading…</p>
-        ) : jobs.length === 0 ? (
+        ) : filteredJobs.length === 0 ? (
           <EmptyState icon={<IconPackage size={28} />} title="No open loads right now" description="New jobs post here as soon as a shipper creates them. Check back shortly." />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {jobs.map((j) => (
+            {filteredJobs.map((j) => (
               <Link to={`/jobs/${j.id}`} key={j.id} className="card block p-5 transition-shadow hover:shadow-md">
                 <div className="flex items-start justify-between gap-3">
                   <div>
