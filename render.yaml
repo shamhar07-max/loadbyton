@@ -1,0 +1,29 @@
+# Render Blueprint for Loadbyton — one service: Express serves both the
+# API and the built SPA (matches "production mode" in docs/DEVELOPER_GUIDE.md).
+#
+# NOTE on persistence: Render's free plan has an ephemeral filesystem — no
+# attached disk, so server/data/loadbyton.db (and anything written to it)
+# resets on every restart/redeploy. Fine for a demo (it just reseeds), not
+# fine for real data. To persist across restarts, switch `plan` to a paid
+# tier (`starter` or above) and uncomment the `disk` block below.
+services:
+  - type: web
+    name: loadbyton
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: cd web && npm install && npm run build && cd ../server && npm install
+    startCommand: cd server && node index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.2
+      - key: FRONTEND_URL
+        value: https://loadbyton.onrender.com
+      # - key: DB_PATH
+      #   value: /data/loadbyton.db   # only meaningful once a disk is mounted
+    # disk:
+    #   name: loadbyton-data
+    #   mountPath: /data
+    #   sizeGB: 1

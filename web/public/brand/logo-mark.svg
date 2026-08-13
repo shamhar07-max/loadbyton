@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Loadbyton mark">
+  <!--
+    The Loadbyton mark: an "L" built from a container silhouette, with a
+    beacon (the live-tracking / geofence accent) riding its top-right
+    shoulder. Two solid shapes only, so it reads at 16px (favicon) and at
+    banner scale alike. The "L" inherits `currentColor` so it can sit on
+    light or dark surfaces; the beacon stays brand amber in both.
+  -->
+  <path
+    d="M14 12 H28 V42 H48 V56 H14 Z"
+    fill="currentColor"
+  />
+  <rect x="28" y="8" width="16" height="16" rx="4" fill="#D97706" />
+</svg>
