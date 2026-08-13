@@ -3,13 +3,18 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
-import { CONTAINER_SIZES, CONTAINER_TYPES, TERMINALS, AREAS, formatAED, formatDate, formatLabel } from '../lib/constants.js';
-import { Button, Card, Stat, Input, Label, Select, Textarea, EmptyState, StatusBadge } from '../components/ui.jsx';
+import {
+  CONTAINER_SIZES, CONTAINER_TYPES, TERMINALS, AREAS, EQUIPMENT_TYPES, CONTAINER_EQUIPMENT,
+  equipmentLabel, formatAED, formatDate, formatLabel,
+} from '../lib/constants.js';
+import { Button, Card, Stat, Input, Label, Select, Textarea, EmptyState, StatusBadge, Badge } from '../components/ui.jsx';
 import { IconPlus, IconPackage, IconChevronRight } from '../components/icons.jsx';
 
 const emptyJob = {
+  equipmentType: 'CONTAINER_CHASSIS',
   containerSize: '40HC', containerType: 'DRY', containerNumber: '', pickupTerminal: TERMINALS[0], deliveryArea: AREAS[0],
   deliveryAddress: '', readyAt: '', deadline: '', maxBudgetAed: '', requiresReefer: false, requiresHazmat: false, notes: '',
+  containerCount: 1, truckCount: 1,
 };
 
 export default function Dashboard() {
@@ -35,7 +40,12 @@ export default function Dashboard() {
     setSubmitting(true);
     setError('');
     try {
-      await api.createJob({ ...form, maxBudgetAed: form.maxBudgetAed ? Number(form.maxBudgetAed) : undefined });
+      await api.createJob({
+        ...form,
+        maxBudgetAed: form.maxBudgetAed ? Number(form.maxBudgetAed) : undefined,
+        containerCount: Number(form.containerCount) || 1,
+        truckCount: Number(form.truckCount) || 1,
+      });
       setForm(emptyJob);
       setShowForm(false);
       load();
@@ -79,18 +89,33 @@ export default function Dashboard() {
           </Card.Header>
           <form onSubmit={onCreate}>
             <Card.Content className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label>Container size</Label>
-                <Select value={form.containerSize} onChange={(e) => setForm({ ...form, containerSize: e.target.value })}>
-                  {CONTAINER_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+              <div className="sm:col-span-2">
+                <Label>Equipment type</Label>
+                <Select value={form.equipmentType} onChange={(e) => setForm({ ...form, equipmentType: e.target.value })}>
+                  {EQUIPMENT_TYPES.map((t) => <option key={t} value={t}>{equipmentLabel(t)}</option>)}
                 </Select>
+                <p className="mt-1 text-xs text-ink-muted">
+                  {CONTAINER_EQUIPMENT.includes(form.equipmentType)
+                    ? 'Container-carrying equipment — set the container size and type below.'
+                    : 'General freight — describe the cargo in the notes field below instead of a container size.'}
+                </p>
               </div>
-              <div>
-                <Label>Container type</Label>
-                <Select value={form.containerType} onChange={(e) => setForm({ ...form, containerType: e.target.value })}>
-                  {CONTAINER_TYPES.map((t) => <option key={t} value={t}>{formatLabel(t)}</option>)}
-                </Select>
-              </div>
+              {CONTAINER_EQUIPMENT.includes(form.equipmentType) ? (
+                <>
+                  <div>
+                    <Label>Container size</Label>
+                    <Select value={form.containerSize} onChange={(e) => setForm({ ...form, containerSize: e.target.value })}>
+                      {CONTAINER_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Container type</Label>
+                    <Select value={form.containerType} onChange={(e) => setForm({ ...form, containerType: e.target.value })}>
+                      {CONTAINER_TYPES.map((t) => <option key={t} value={t}>{formatLabel(t)}</option>)}
+                    </Select>
+                  </div>
+                </>
+              ) : null}
               <div>
                 <Label>Pickup terminal</Label>
                 <Select value={form.pickupTerminal} onChange={(e) => setForm({ ...form, pickupTerminal: e.target.value })}>
@@ -115,6 +140,20 @@ export default function Dashboard() {
                 <Label>Deadline</Label>
                 <Input type="datetime-local" required value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
               </div>
+              <div className="sm:col-span-2 rounded-lg border p-4" style={{ borderColor: 'var(--border-default)', background: 'var(--bg-raised)' }}>
+                <p className="text-sm font-medium text-ink">Volume — how much does this job cover?</p>
+                <p className="mt-0.5 text-xs text-ink-muted">Leave both at 1 for a single load. Raise either to post one inquiry a carrier fulfils as a batch.</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label>No. of containers</Label>
+                    <Input type="number" min="1" value={form.containerCount} onChange={(e) => setForm({ ...form, containerCount: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>No. of trucks</Label>
+                    <Input type="number" min="1" value={form.truckCount} onChange={(e) => setForm({ ...form, truckCount: e.target.value })} />
+                  </div>
+                </div>
+              </div>
               <div>
                 <Label>Max budget (AED, optional)</Label>
                 <Input type="number" min="0" value={form.maxBudgetAed} onChange={(e) => setForm({ ...form, maxBudgetAed: e.target.value })} placeholder="600" />
@@ -128,8 +167,14 @@ export default function Dashboard() {
                 </label>
               </div>
               <div className="sm:col-span-2">
-                <Label>Notes (optional)</Label>
-                <Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Gate pass instructions, contact on site, etc." />
+                <Label>{CONTAINER_EQUIPMENT.includes(form.equipmentType) ? 'Notes (optional)' : 'Cargo description'}</Label>
+                <Textarea
+                  rows={2}
+                  required={!CONTAINER_EQUIPMENT.includes(form.equipmentType)}
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  placeholder={CONTAINER_EQUIPMENT.includes(form.equipmentType) ? 'Gate pass instructions, contact on site, etc.' : 'What is being moved — e.g. "40 tonnes of aggregate, site access via gate 4."'}
+                />
               </div>
               {error && <p className="sm:col-span-2 rounded-md px-3 py-2 text-sm" style={{ background: 'var(--status-danger-bg)', color: 'var(--status-danger)' }}>{error}</p>}
             </Card.Content>
@@ -179,7 +224,14 @@ export default function Dashboard() {
                     <tr key={j.id} className="border-b last:border-0 hover:bg-raised" style={{ borderColor: 'var(--border-subtle)' }}>
                       <td className="px-5 py-3">
                         <p className="font-mono text-xs text-ink-muted">{j.job_code}</p>
-                        <p className="font-medium text-ink">{j.container_size} {formatLabel(j.container_type)}</p>
+                        <p className="font-medium text-ink">
+                          {CONTAINER_EQUIPMENT.includes(j.equipment_type) ? `${j.container_size} ${formatLabel(j.container_type)}` : equipmentLabel(j.equipment_type)}
+                        </p>
+                        {(j.container_count > 1 || j.truck_count > 1) && (
+                          <Badge className="mt-1" color="accent">
+                            {j.container_count > 1 ? `×${j.container_count} containers` : `×${j.truck_count} trucks`}
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-5 py-3 text-ink-secondary">{formatLabel(j.pickup_terminal)} → {formatLabel(j.delivery_area)}</td>
                       <td className="px-5 py-3"><StatusBadge status={j.status} /></td>

@@ -71,6 +71,31 @@ for orientation, `docs/ARCHITECTURE.md` before touching business logic, and
   `main.jsx`) specifically so a slow or unreachable font CDN never delays first paint
   of the app shell. Keep that pattern if you touch `web/index.html`.
 
+## Product scope: equipment, volume, UAE-wide
+
+- Loadbyton is **not** container-only or Jebel-Ali-only. `jobs.equipment_type`
+  (12 values, `server/index.js` `EQUIPMENT_TYPES`, mirrored in
+  `web/src/lib/constants.js`) covers general UAE road freight — lowbed, flatbed,
+  tripper, side loader, curtain/box trucks, 3–10T pickups — alongside the original
+  container-chassis/reefer flow. `container_size`/`container_type` only mean
+  something for `CONTAINER_CHASSIS`/`REEFER_TRUCK`; keep that branch (in
+  `POST /api/jobs`) in sync if you add an equipment type.
+- `jobs.container_count`/`jobs.truck_count` implement the "volume inquiry" — a
+  single job can request N containers or N trucks; one carrier bid/award covers
+  the whole batch. `estimateRate()` in `server/lib/lanes.js` multiplies by
+  `max(container_count, truck_count)` — pass `quantity` through if you add another
+  rate-estimating call site.
+- `server/lib/lanes.js` `unifiedLanes` spans four emirates (Dubai, Abu Dhabi,
+  Sharjah, Fujairah), not just Jebel Ali/Khalifa — `TERMINAL_INFO` in
+  `web/src/lib/constants.js` maps each terminal to its emirate/operator for
+  display. Don't reintroduce Jebel-Ali-only copy on the Landing/About/Features
+  pages or in `index.html` meta tags.
+- The brand mark (`web/public/brand/*.svg`, `favicon.svg`) is the "container
+  plate" — fixed navy/white/crimson tile, not a `currentColor` glyph. The crimson
+  divider bars use `--lb-logo-accent-500`/`400` (`docs/brand/design-tokens.css`) —
+  a token reserved for the logo only, kept deliberately separate from
+  `--lb-red-*` (UI danger/status color) so the two never drift together.
+
 ## Verification
 
 There's no automated test suite yet (`TODOS.md` TODO-1). To check a change:

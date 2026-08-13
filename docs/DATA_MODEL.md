@@ -98,7 +98,9 @@ The core entity.
 | `delivered_at` | TEXT | set by POD; starts auto-release window |
 | `auto_release_processed` | INTEGER | 1 once the 24h fallback fired (migration-added) |
 | `payout_released_at` | TEXT | |
-| `container_count` | INTEGER | default 1 (migration-added) |
+| `container_count` | INTEGER | default 1 (migration-added) — "no. of containers" for a volume inquiry |
+| `truck_count` | INTEGER | default 1 (migration-added) — "no. of trucks" for a volume inquiry |
+| `equipment_type` | TEXT | default `CONTAINER_CHASSIS` (migration-added) — one of `CONTAINER_CHASSIS`, `REEFER_TRUCK`, `LOWBED_TRAILER`, `FLATBED_TRAILER`, `BOX_TRUCK`, `CURTAIN_TRUCK`, `PICKUP_3T`, `PICKUP_5T`, `PICKUP_7T`, `PICKUP_10T`, `SIDE_LOADER_TRAILER`, `TRIPPER`. `container_size`/`container_type` only apply when this is `CONTAINER_CHASSIS` or `REEFER_TRUCK` — otherwise the server sets them to `'N/A'`/`'GENERAL'` and the cargo is described in `notes` instead. |
 | `created_at` / `updated_at` | TEXT | |
 
 ### `bids`
@@ -270,7 +272,7 @@ Both editable by admin (`PATCH /api/admin/settings`); `commission_rate_bps` is c
 - `payouts.release_type`
 - `audit_log.entity_type/entity_id/before_state/after_state/request_id`
 - `users.mfa_secret`
-- `jobs.container_count`
+- `jobs.container_count`, `jobs.truck_count`, `jobs.equipment_type`
 
 Because the driver is synchronous and startup is the single writer, these are safe to run on every boot.
 

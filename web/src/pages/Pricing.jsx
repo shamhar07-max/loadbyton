@@ -49,7 +49,7 @@ export default function Pricing() {
         </p>
       </div>
 
-      <div className="mt-14 rounded-xl px-8 py-10" style={{ background: 'var(--bg-inverse)' }}>
+      <div className="mt-14 rounded-xl px-8 py-10" style={{ background: 'var(--lb-navy-900)' }}>
         <p className="font-display text-xl font-semibold text-white">No card required to browse open loads.</p>
         <Link to="/register" className="btn-accent mt-4 px-6 py-3 text-base">Create a free account <IconArrowRight size={18} /></Link>
       </div>

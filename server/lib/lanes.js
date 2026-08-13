@@ -10,6 +10,8 @@ const unifiedLanes = [
   { terminal: 'JEBEL_ALI_T1', area: 'DIP', distanceKm: 33, basePriceAed: 1150, pricePerKm: 13, baseMinutes: 55, onTimePct: 89, monthlyLoads: 60 },
   { terminal: 'JEBEL_ALI_T2', area: 'AL_QUSAIS', distanceKm: 45, basePriceAed: 1450, pricePerKm: 14, baseMinutes: 70, onTimePct: 87, monthlyLoads: 40 },
   { terminal: 'KHALIFA_PORT', area: 'MUSAFFAH', distanceKm: 27, basePriceAed: 980, pricePerKm: 12.5, baseMinutes: 48, onTimePct: 92, monthlyLoads: 55 },
+  { terminal: 'PORT_KHALID', area: 'SHARJAH_INDUSTRIAL', distanceKm: 18, basePriceAed: 780, pricePerKm: 11.5, baseMinutes: 40, onTimePct: 90, monthlyLoads: 48 },
+  { terminal: 'FUJAIRAH_PORT', area: 'FUJAIRAH_FREEZONE', distanceKm: 12, basePriceAed: 620, pricePerKm: 13.5, baseMinutes: 32, onTimePct: 93, monthlyLoads: 33 },
 ].map((lane) => ({ ...lane, laneId: `${lane.terminal}:${lane.area}` }));
 
 function findLane(terminal, area) {
@@ -33,17 +35,19 @@ function weightMultiplier(weightTons) {
   return 1.0;
 }
 
-function estimateRate({ terminal, area, weightTons, urgency }) {
+function estimateRate({ terminal, area, weightTons, urgency, quantity }) {
   const lane = findLane(terminal, area);
   const wMod = weightMultiplier(weightTons);
   const uMod = urgencyMultiplier(urgency);
-  const estimatedAED = Math.round(lane.basePriceAed * wMod * uMod);
+  const qty = Math.max(1, Number(quantity) || 1);
+  const estimatedAED = Math.round(lane.basePriceAed * wMod * uMod * qty);
   return {
     estimatedAED,
     base: lane.basePriceAed,
     weightTons: Number(weightTons) || 0,
     urgencyMod: uMod,
-    methodology: `Lane index base AED ${lane.basePriceAed} for ${lane.laneId} × weight factor ${wMod.toFixed(2)} (>10t: ×1.1, >20t: ×1.2) × urgency factor ${uMod.toFixed(2)} (express ×1.3, urgent ×1.15, standard ×1.0).`,
+    quantity: qty,
+    methodology: `Lane index base AED ${lane.basePriceAed} for ${lane.laneId} × weight factor ${wMod.toFixed(2)} (>10t: ×1.1, >20t: ×1.2) × urgency factor ${uMod.toFixed(2)} (express ×1.3, urgent ×1.15, standard ×1.0)${qty > 1 ? ` × volume ×${qty} (${qty} units in this inquiry)` : ''}.`,
   };
 }
 

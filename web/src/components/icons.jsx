@@ -35,3 +35,6 @@ export const IconSun = (p) => <Icon {...p}><circle cx="12" cy="12" r="4" /><path
 export const IconMoon = (p) => <Icon {...p}><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z" /></Icon>;
 export const IconMessage = (p) => <Icon {...p}><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" /></Icon>;
 export const IconTag = (p) => <Icon {...p}><path d="M12.6 2H4a2 2 0 0 0-2 2v8.6a2 2 0 0 0 .6 1.4l9 9a2 2 0 0 0 2.8 0l8-8a2 2 0 0 0 0-2.8l-9-9a2 2 0 0 0-1.4-.6Z" /><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none" /></Icon>;
+export const IconTrailer = (p) => <Icon {...p}><path d="M2 8h13v8H2z" /><path d="M15 12h4l3 2v2h-7z" /><circle cx="6" cy="18" r="1.6" /><circle cx="18.5" cy="18" r="1.6" /><path d="M2 8V6h9v2" /></Icon>;
+export const IconLayers = (p) => <Icon {...p}><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></Icon>;
+export const IconCompass = (p) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="m15 9-2 6-6 2 2-6 6-2Z" /></Icon>;

@@ -115,15 +115,18 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
 - **Body:**
   ```json
   {
+    "equipmentType": "CONTAINER_CHASSIS",
     "containerSize": "40HC", "containerType": "DRY", "containerNumber": "MSKU9281745",
     "pickupTerminal": "JEBEL_ALI_T2", "deliveryArea": "JAFZA_SOUTH",
     "deliveryAddress": "Street 14, Warehouse 8B, JAFZA South, Dubai",
     "readyAt": "<iso>", "deadline": "<iso>", "maxBudgetAed": 1400,
     "requiresReefer": false, "requiresHazmat": false,
+    "containerCount": 1, "truckCount": 1,
     "freeTimeDays": 5, "demurrageRateAed": 400,
     "templateId": null, "contractLaneId": null, "notes": "..."
   }
   ```
+  `equipmentType` defaults to `CONTAINER_CHASSIS` if omitted/invalid — one of the 12 values in `DATA_MODEL.md`'s `jobs.equipment_type`. `containerSize`/`containerType` are only validated (and required) when `equipmentType` is `CONTAINER_CHASSIS` or `REEFER_TRUCK`; for every other equipment type the server stores `'N/A'`/`'GENERAL'` regardless of what's sent, and `notes` becomes the required cargo description instead. `containerCount`/`truckCount` default to `1` — raise either for a volume inquiry (one job, one award, covering the stated batch).
 - **201** `{ job }` with generated `job_code` (e.g. `LBT-DXB-2608-4921`), status `OPEN`.
 
 ### `GET /api/jobs/:id`
@@ -132,14 +135,14 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
 
 ### `POST /api/jobs/:id/bids`
 - **Auth:** `CARRIER` **+ verified profile** + job `OPEN`
-- **Body:** `{ amountAed, etaMinutes (1–600), truckType, driverName, notes }`
+- **Body:** `{ amountAed, etaMinutes (1–600), truckType, driverName, notes }` — `truckType` is free text (stored as-is); the client UI offers the 12 `equipment_type` values as a picklist defaulting to the job's own requirement, but the field isn't server-validated against that enum.
 - **201** `{ bid }`
 - **403** unverified carrier or job not open (`{ "error": "Carrier verification required to bid." }`).
 
 ### `POST /api/jobs/:id/rate`
 - **Auth:** session (job participant or admin)
 - **Body:** `{ origin?, destination?, weightTons?, urgency?: "express"|"urgent"|"standard" }`
-- **200** `{ estimatedAED, base, weightTons, urgencyMod, methodology }` — lane-index base price adjusted by weight (>10 t → ×1.1, >20 t → ×1.2) and urgency (express ×1.3, urgent ×1.15).
+- **200** `{ estimatedAED, base, weightTons, urgencyMod, quantity, methodology }` — lane-index base price adjusted by weight (>10 t → ×1.1, >20 t → ×1.2), urgency (express ×1.3, urgent ×1.15), and `quantity` (`max(container_count, truck_count)` on the job — a ×6 volume inquiry estimates ×6 the single-unit rate).
 
 ### `POST /api/jobs/:id/optimize-route`
 - **Auth:** session (job participant or admin)

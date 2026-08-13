@@ -43,6 +43,13 @@
   --lb-red-500: #EF4444;
   --lb-red-100: #FEE2E2;
 
+  /* Reserved for the Loadbyton mark's divider bars only (web/public/brand/*
+     and favicon.svg). Never assign to a semantic/status/UI role — that's
+     what --lb-red-* above is for. Keeping these separate means the two can
+     never accidentally drift together. */
+  --lb-logo-accent-500: #D6321F;
+  --lb-logo-accent-400: #E0472F;
+
   /* primitive: type */
   --lb-font-display: 'Space Grotesk', ui-sans-serif, sans-serif;
   --lb-font-body: 'Inter', ui-sans-serif, sans-serif;

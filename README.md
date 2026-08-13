@@ -1,6 +1,6 @@
 # Loadbyton
 
-**UAE Container Drayage Freight Marketplace** — a full-stack platform that connects **shippers** who need containers moved out of Jebel Ali (and other UAE ports) with **carriers** who truck them, and gives **admins** a verification, escrow and dispute console.
+**UAE Road Freight & Container Drayage Marketplace** — a full-stack platform that connects **shippers** who need a container, a flatbed load, or a multi-truck job moved across Dubai, Abu Dhabi, Sharjah, or Fujairah with **carriers** who truck them (across 12 equipment types, from a container chassis to a tripper), and gives **admins** a verification, escrow and dispute console.
 
 Built as a monorepo: an Express API (Node 22 + `node:sqlite`) and a React + Vite + Tailwind single-page app. No external database server, no OAuth provider, no cloud dependencies — everything runs locally.
 

@@ -13,32 +13,41 @@ drift from them.
 
 ## 1. The mark
 
-**Concept — "the load, tracked."** The mark is an abstract **L** built from a
-container silhouette (a tall block over a wide block — the shape of a container
-stacked on a chassis), with a **beacon** riding its top-right shoulder. The beacon
-is the product's actual differentiator made visual: Loadbyton doesn't just move a
-box, it tracks it — live status, geofence, demurrage clock. The mark is the
-product's core promise in two shapes.
+**Concept — "the container plate."** The mark is a navy, ribbed-panel tile with
+rounded corner rivets — a real container corner-casting, abstracted — carrying a
+white load pictogram at its centre, flanked by two thin **crimson bars**. Those
+bars are the mark's one fixed signature: the same two bars split the wordmark
+itself, between `LOAD`, `BY`, and `TON`, so the icon and the wordmark always read
+as one system. Unlike the previous mark, the tile is not a `currentColor` glyph —
+it's a fixed navy/white/crimson unit that looks the same on every surface, the way
+a physical plate riveted to a container would.
 
-- `web/public/brand/logo-mark.svg` — icon only. The "L" uses `currentColor` so it
-  can sit on any surface; the beacon stays brand amber always.
-- `web/public/brand/logo-full.svg` — full lockup (mark + wordmark) for light
-  surfaces; ink-navy wordmark.
-- `web/public/brand/logo-full-on-dark.svg` — same lockup, paper-white wordmark,
-  for the dark navy surface (nav bar, footer, hero).
-- `web/public/favicon.svg` — mark on a filled rounded-navy tile, for browser-tab
-  legibility regardless of theme.
+- `web/public/brand/logo-mark.svg` — icon only, with the ribbed-panel texture and
+  corner rivets at full detail. Used at nav scale (~28px) and anywhere the mark
+  stands alone.
+- `web/public/brand/logo-full.svg` — full lockup (tile + wordmark) for light
+  surfaces; ink-navy `LOAD·BY·TON`, crimson divider bars.
+- `web/public/brand/logo-full-on-dark.svg` — same lockup, paper-white wordmark and
+  a slightly lifted crimson (`--lb-logo-accent-400`) for contrast, for the dark
+  navy surface (nav bar, footer, hero).
+- `web/public/favicon.svg` — the tile simplified to its three load-bearing shapes
+  (navy ground, crimson bars, white pictogram) with the ribbing dropped — at
+  16–32px browser-tab scale, texture reads as noise, not detail.
 
-**Clear space & minimum size.** Keep clear space around the mark equal to the
-height of the beacon square on every side. Never render the icon mark below 20px;
-below that, use the favicon tile instead of the transparent mark.
+**Clear space & minimum size.** Keep clear space around the tile equal to one
+corner-rivet's diameter on every side. Never render the full-detail mark below
+20px; below that, use the favicon variant, which is built for exactly that scale.
 
 **Don't:**
-- Don't recolor the beacon — it's the one fixed constant across every surface.
-- Don't stretch, skew, or rotate the mark.
+- Don't recolor the crimson bars to anything but `--lb-logo-accent-500` (light
+  surfaces) or `--lb-logo-accent-400` (dark surfaces) — this is a reserved pair,
+  never `--lb-red-*` (that's the UI danger/status color; keeping them separate
+  means the two can never accidentally drift together).
+- Don't stretch, skew, or rotate the tile, and don't drop the rounded corners.
 - Don't place the light-wordmark lockup on anything lighter than `--lb-slate-200`,
   or the dark-wordmark lockup on anything darker than `--lb-navy-800`.
-- Don't add a drop shadow, bevel, or outline — the mark is flat by design.
+- Don't add a drop shadow, bevel, or outline beyond the tile's own 1px edge —
+  the mark is otherwise flat by design.
 
 ---
 

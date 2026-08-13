@@ -3,8 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
-import { STATUS_FLOW, formatAED, formatDate, formatDateTime, formatLabel } from '../lib/constants.js';
-import { Button, Card, Input, Label, Textarea, Badge, StatusBadge, EscrowBadge, Spinner } from '../components/ui.jsx';
+import { STATUS_FLOW, formatAED, formatDate, formatDateTime, formatLabel, EQUIPMENT_TYPES, CONTAINER_EQUIPMENT, equipmentLabel } from '../lib/constants.js';
+import { Button, Card, Input, Label, Select, Textarea, Badge, StatusBadge, EscrowBadge, Spinner } from '../components/ui.jsx';
 import { IconCheck, IconClock, IconMapPin, IconFile, IconMessage, IconStar, IconAlert } from '../components/icons.jsx';
 
 function Section({ title, children, action }) {
@@ -101,12 +101,17 @@ export default function JobDetail() {
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="font-mono text-xs text-ink-muted">{job.job_code}</p>
-          <h1 className="mt-1 font-display text-2xl font-semibold text-ink">{job.container_size} {formatLabel(job.container_type)} · {formatLabel(job.pickup_terminal)} → {formatLabel(job.delivery_area)}</h1>
+          <h1 className="mt-1 font-display text-2xl font-semibold text-ink">
+            {CONTAINER_EQUIPMENT.includes(job.equipment_type) ? `${job.container_size} ${formatLabel(job.container_type)}` : equipmentLabel(job.equipment_type)} · {formatLabel(job.pickup_terminal)} → {formatLabel(job.delivery_area)}
+          </h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <StatusBadge status={job.status} />
             <EscrowBadge status={job.escrow_status} />
+            <Badge color="neutral">{equipmentLabel(job.equipment_type)}</Badge>
             {!!job.requires_hazmat && <Badge color="warning">Hazmat</Badge>}
             {!!job.requires_reefer && <Badge color="info">Reefer</Badge>}
+            {job.container_count > 1 && <Badge color="accent">×{job.container_count} containers</Badge>}
+            {job.truck_count > 1 && <Badge color="accent">×{job.truck_count} trucks</Badge>}
           </div>
         </div>
         <div className="text-right">
@@ -127,7 +132,13 @@ export default function JobDetail() {
         <div>
           <Section title="Shipment details">
             <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
-              <div><dt className="text-ink-muted">Container #</dt><dd className="mt-0.5 font-medium text-ink">{job.container_number || '—'}</dd></div>
+              <div><dt className="text-ink-muted">Equipment</dt><dd className="mt-0.5 font-medium text-ink">{equipmentLabel(job.equipment_type)}</dd></div>
+              {CONTAINER_EQUIPMENT.includes(job.equipment_type) && (
+                <div><dt className="text-ink-muted">Container #</dt><dd className="mt-0.5 font-medium text-ink">{job.container_number || '—'}</dd></div>
+              )}
+              {(job.container_count > 1 || job.truck_count > 1) && (
+                <div><dt className="text-ink-muted">Volume</dt><dd className="mt-0.5 font-medium text-ink">{job.container_count > 1 ? `${job.container_count} containers` : `${job.truck_count} trucks`}</dd></div>
+              )}
               <div><dt className="text-ink-muted">Ready at</dt><dd className="mt-0.5 font-medium text-ink">{formatDateTime(job.ready_at)}</dd></div>
               <div><dt className="text-ink-muted">Deadline</dt><dd className="mt-0.5 font-medium text-ink">{formatDateTime(job.deadline)}</dd></div>
               <div><dt className="text-ink-muted">Free time</dt><dd className="mt-0.5 font-medium text-ink">{job.free_time_days} days</dd></div>
@@ -146,7 +157,7 @@ export default function JobDetail() {
                   <div key={b.id} className="flex items-center justify-between rounded-md border px-4 py-3" style={{ borderColor: b.status === 'ACCEPTED' ? 'var(--status-success)' : 'var(--border-default)' }}>
                     <div>
                       <p className="tabular font-display text-base font-semibold text-ink">{b.masked ? 'Hidden until award' : formatAED(b.amount_aed)}</p>
-                      <p className="text-xs text-ink-muted">{b.masked ? 'Competing bid' : `${b.eta_minutes} min ETA · ${b.truck_type || 'truck n/a'}`}</p>
+                      <p className="text-xs text-ink-muted">{b.masked ? 'Competing bid' : `${b.eta_minutes} min ETA · ${b.truck_type ? equipmentLabel(b.truck_type) : 'equipment n/a'}`}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <Badge color={b.status === 'ACCEPTED' ? 'success' : b.status === 'REJECTED' ? 'danger' : 'neutral'}>{b.status}</Badge>
@@ -160,7 +171,7 @@ export default function JobDetail() {
             )}
 
             {isCarrier && job.status === 'OPEN' && !myBid && (
-              <BidForm jobId={job.id} verified={user.is_verified} onDone={load} />
+              <BidForm jobId={job.id} verified={user.is_verified} defaultEquipment={job.equipment_type} onDone={load} />
             )}
           </Section>
 
@@ -243,8 +254,8 @@ export default function JobDetail() {
   );
 }
 
-function BidForm({ jobId, verified, onDone }) {
-  const [form, setForm] = useState({ amountAed: '', etaMinutes: '', truckType: '', driverName: '', notes: '' });
+function BidForm({ jobId, verified, defaultEquipment, onDone }) {
+  const [form, setForm] = useState({ amountAed: '', etaMinutes: '', truckType: defaultEquipment || 'CONTAINER_CHASSIS', driverName: '', notes: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -281,8 +292,10 @@ function BidForm({ jobId, verified, onDone }) {
         <Input type="number" required min="1" max="600" value={form.etaMinutes} onChange={(e) => setForm({ ...form, etaMinutes: e.target.value })} />
       </div>
       <div>
-        <Label>Truck type</Label>
-        <Input value={form.truckType} onChange={(e) => setForm({ ...form, truckType: e.target.value })} placeholder="3-axle flatbed" />
+        <Label>Equipment you're bidding with</Label>
+        <Select value={form.truckType} onChange={(e) => setForm({ ...form, truckType: e.target.value })}>
+          {EQUIPMENT_TYPES.map((t) => <option key={t} value={t}>{equipmentLabel(t)}</option>)}
+        </Select>
       </div>
       <div>
         <Label>Driver name</Label>

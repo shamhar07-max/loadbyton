@@ -242,6 +242,8 @@ addColumn('jobs', 'delivered_at', 'delivered_at TEXT');
 addColumn('jobs', 'auto_release_processed', 'auto_release_processed INTEGER NOT NULL DEFAULT 0');
 addColumn('jobs', 'payout_released_at', 'payout_released_at TEXT');
 addColumn('jobs', 'container_count', 'container_count INTEGER NOT NULL DEFAULT 1');
+addColumn('jobs', 'truck_count', 'truck_count INTEGER NOT NULL DEFAULT 1');
+addColumn('jobs', 'equipment_type', "equipment_type TEXT NOT NULL DEFAULT 'CONTAINER_CHASSIS'");
 
 addColumn('payouts', 'release_type', 'release_type TEXT');
 

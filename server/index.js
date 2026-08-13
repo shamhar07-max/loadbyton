@@ -55,6 +55,17 @@ const CONTAINER_TYPES = ['DRY', 'REEFER', 'HAZMAT', 'OPEN_TOP', 'FLAT_RACK'];
 const DOC_TYPES = ['CUSTOMS', 'RECEIPT', 'POD', 'LICENCE', 'INSURANCE', 'OTHER'];
 const STATUS_ORDER = ['DRAFT', 'OPEN', 'AWARDED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
 
+// Equipment/vehicle types a job can require and a carrier can bid with. The
+// two container-carrying types are the only ones where container_size/
+// container_type mean anything — every other type is general UAE road
+// freight (construction plant, palletised/boxed cargo, small-load pickups).
+const EQUIPMENT_TYPES = [
+  'CONTAINER_CHASSIS', 'REEFER_TRUCK', 'LOWBED_TRAILER', 'FLATBED_TRAILER', 'BOX_TRUCK',
+  'CURTAIN_TRUCK', 'PICKUP_3T', 'PICKUP_5T', 'PICKUP_7T', 'PICKUP_10T',
+  'SIDE_LOADER_TRAILER', 'TRIPPER',
+];
+const CONTAINER_EQUIPMENT = ['CONTAINER_CHASSIS', 'REEFER_TRUCK'];
+
 function getSettings() {
   const rows = db.prepare('SELECT key, value FROM settings').all();
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
@@ -440,10 +451,25 @@ app.get('/api/jobs', auth(), (req, res) => {
 
 app.post('/api/jobs', auth(['SHIPPER']), (req, res) => {
   const b = req.body || {};
-  const required = ['containerSize', 'containerType', 'pickupTerminal', 'deliveryArea', 'deliveryAddress', 'readyAt', 'deadline'];
+  const required = ['pickupTerminal', 'deliveryArea', 'deliveryAddress', 'readyAt', 'deadline'];
   for (const f of required) if (!b[f]) return sendError(res, 400, `${f} is required`);
-  if (!CONTAINER_SIZES.includes(b.containerSize)) return sendError(res, 400, 'Invalid containerSize');
-  if (!CONTAINER_TYPES.includes(b.containerType)) return sendError(res, 400, 'Invalid containerType');
+
+  const equipmentType = EQUIPMENT_TYPES.includes(b.equipmentType) ? b.equipmentType : 'CONTAINER_CHASSIS';
+  const needsContainer = CONTAINER_EQUIPMENT.includes(equipmentType);
+
+  let containerSize = 'N/A';
+  let containerType = 'GENERAL';
+  if (needsContainer) {
+    if (!b.containerSize || !CONTAINER_SIZES.includes(b.containerSize)) return sendError(res, 400, 'Invalid containerSize');
+    if (!b.containerType || !CONTAINER_TYPES.includes(b.containerType)) return sendError(res, 400, 'Invalid containerType');
+    containerSize = b.containerSize;
+    containerType = b.containerType;
+  } else if (!b.notes) {
+    return sendError(res, 400, 'cargoDescription (notes) is required for non-container equipment');
+  }
+
+  const containerCount = Math.max(1, Number(b.containerCount) || 1);
+  const truckCount = Math.max(1, Number(b.truckCount) || 1);
 
   let code = jobCode();
   while (db.prepare('SELECT 1 FROM jobs WHERE job_code=?').get(code)) code = jobCode();
@@ -452,16 +478,16 @@ app.post('/api/jobs', auth(['SHIPPER']), (req, res) => {
     .prepare(
       `INSERT INTO jobs (job_code, shipper_id, contract_lane_id, template_id, container_size, container_type, container_number,
          pickup_terminal, delivery_area, delivery_address, ready_at, deadline, max_budget_aed, status, escrow_status,
-         requires_reefer, requires_hazmat, free_time_days, demurrage_rate_aed, notes)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'OPEN','PENDING',?,?,?,?,?)`
+         requires_reefer, requires_hazmat, free_time_days, demurrage_rate_aed, notes, equipment_type, container_count, truck_count)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'OPEN','PENDING',?,?,?,?,?,?,?,?)`
     )
     .run(
       code,
       req.user.id,
       b.contractLaneId || null,
       b.templateId || null,
-      b.containerSize,
-      b.containerType,
+      containerSize,
+      containerType,
       b.containerNumber || null,
       b.pickupTerminal,
       b.deliveryArea,
@@ -473,7 +499,10 @@ app.post('/api/jobs', auth(['SHIPPER']), (req, res) => {
       b.requiresHazmat ? 1 : 0,
       b.freeTimeDays ?? 5,
       b.demurrageRateAed ?? 400,
-      b.notes || null
+      b.notes || null,
+      equipmentType,
+      containerCount,
+      truckCount
     );
   const jobId = Number(result.lastInsertRowid);
   writeAudit(req, { userId: req.user.id, action: 'JOB_CREATE', details: `${code} posted`, entityType: 'job', entityId: jobId, afterState: 'OPEN' });
@@ -533,6 +562,7 @@ app.post('/api/jobs/:id/rate', auth(), (req, res) => {
     area: job.delivery_area,
     weightTons: b.weightTons,
     urgency: b.urgency,
+    quantity: Math.max(job.container_count || 1, job.truck_count || 1),
   });
   res.json(result);
 });

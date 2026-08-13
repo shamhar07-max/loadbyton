@@ -89,15 +89,17 @@ module.exports = function seed() {
         `INSERT INTO jobs (job_code, shipper_id, carrier_id, container_size, container_type, container_number,
            pickup_terminal, delivery_area, delivery_address, ready_at, deadline, max_budget_aed, agreed_price_aed,
            status, awarded_bid_id, requires_reefer, requires_hazmat, notes, free_time_days, demurrage_rate_aed,
-           escrow_status, delivered_at, auto_release_processed, payout_released_at, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+           escrow_status, delivered_at, auto_release_processed, payout_released_at, created_at, updated_at,
+           equipment_type, container_count, truck_count)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         j.code, shipperId, j.carrierId || null, j.size, j.type, j.number || null,
         j.pickup, j.area, j.address, j.readyAt, j.deadline, j.budget || null, j.price || null,
         j.status, null, j.reefer ? 1 : 0, j.hazmat ? 1 : 0, j.notes || null, j.freeDays ?? 5, j.demurrageRate ?? 400,
         j.escrow, j.deliveredAt || null, j.autoReleased ? 1 : 0, j.payoutReleasedAt || null,
-        j.createdAt || sqliteTime(-10 * DAY), sqliteTime(-1 * DAY)
+        j.createdAt || sqliteTime(-10 * DAY), sqliteTime(-1 * DAY),
+        j.equipment || 'CONTAINER_CHASSIS', j.containerCount ?? 1, j.truckCount ?? 1
       );
     return Number(r.lastInsertRowid);
   }
@@ -194,6 +196,31 @@ module.exports = function seed() {
   ).run(job6, emiratesId, 1200, 72, 1128, sqliteTime(-6 * DAY));
   db.prepare('INSERT INTO ratings (job_id, rater_id, ratee_id, score, comment) VALUES (?,?,?,?,?)').run(job6, shipperId, emiratesId, 5, 'Smooth pickup, on time, driver was easy to reach.');
   db.prepare('INSERT INTO ratings (job_id, rater_id, ratee_id, score, comment) VALUES (?,?,?,?,?)').run(job6, emiratesId, shipperId, 5, 'Clear instructions, easy customs handoff.');
+
+  // Job 7 — OPEN, general freight (non-container), Sharjah — Tripper hauling
+  // aggregate for a construction site, 4 trucks needed in one volume inquiry.
+  // Demonstrates equipment breadth + volume-by-trucks outside Dubai.
+  const job7 = insertJob({
+    code: 'LBT-SHJ-2608-1104', size: 'N/A', type: 'GENERAL',
+    pickup: 'PORT_KHALID', area: 'SHARJAH_INDUSTRIAL', address: 'Sharjah Industrial Area 12, Site Gate 4',
+    readyAt: sqliteTime(1 * DAY), deadline: sqliteTime(2 * DAY), budget: 3200, status: 'OPEN', escrow: 'PENDING',
+    notes: 'Aggregate haul from Port Khalid stockyard to site — 4 tripper loads across the day, same address.',
+    equipment: 'TRIPPER', truckCount: 4,
+  });
+  insertBid(job7, gulfheavyId, 3000, 35, 'PENDING', 'Imran Sheikh', 'TRIPPER');
+  insertBid(job7, desertlineId, 2850, 45, 'PENDING', 'Yusuf Al Naqbi', 'TRIPPER');
+
+  // Job 8 — OPEN, container drayage bulk inquiry, Fujairah — 6 containers,
+  // one carrier to cover the full volume. Demonstrates volume-by-containers
+  // on the UAE east coast, not just Dubai/Abu Dhabi.
+  const job8 = insertJob({
+    code: 'LBT-FJR-2608-2231', size: '40FT', type: 'DRY', number: 'BULK-FJR-0823',
+    pickup: 'FUJAIRAH_PORT', area: 'FUJAIRAH_FREEZONE', address: 'Fujairah Free Zone, Warehouse Cluster C',
+    readyAt: sqliteTime(2 * DAY), deadline: sqliteTime(6 * DAY), budget: 4200, status: 'OPEN', escrow: 'PENDING',
+    notes: 'Weekly restock — 6× 40FT dry containers, same lane, one award covers the full batch.',
+    equipment: 'CONTAINER_CHASSIS', containerCount: 6,
+  });
+  insertBid(job8, emiratesId, 3900, 55, 'PENDING', 'Hamdan Youssef', 'CONTAINER_CHASSIS');
 
   // --- Templates & contract lanes -----------------------------------------
   db.prepare(
