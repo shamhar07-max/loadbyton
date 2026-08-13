@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
-import { Button, Card, Badge, EmptyState } from '../components/ui.jsx';
-import { IconMapPin, IconClock, IconChevronRight } from '../components/icons.jsx';
-import { formatAED, formatDate } from '../lib/constants.js';
+import { Button, Card, Badge, EmptyState, StatusBadge } from '../components/ui.jsx';
+import { IconMapPin, IconClock, IconChevronRight, IconPackage } from '../components/icons.jsx';
+import { formatAED, formatDate, formatLabel, CONTAINER_EQUIPMENT, equipmentLabel } from '../lib/constants.js';
+
+const STATUS_FLOW = ['DRAFT', 'OPEN', 'AWARDED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
 
 export default function WonJobs() {
   usePageTitle('Won jobs');
@@ -22,6 +24,14 @@ export default function WonJobs() {
   const filteredJobs = jobs.filter((j) =>
     j.status === 'AWARDED' || j.status === 'PICKED_UP' || j.status === 'IN_TRANSIT' || j.status === 'DELIVERED'
   );
+
+  async function act(fn) {
+    try {
+      await fn();
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   return (
     <div className="container-page py-10">
@@ -104,5 +114,3 @@ function StatusStepperCompact({ job }) {
     </div>
   );
 }
-
-const STATUS_FLOW = ['DRAFT', 'OPEN', 'AWARDED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];

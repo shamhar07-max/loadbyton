@@ -1,26 +1,57 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
+import { formatAED } from '../lib/constants.js';
 import { Button, Card, Badge, EmptyState } from '../components/ui.jsx';
-import { IconChevronRight, IconX } from '../components/icons.jsx';
+import { IconChevronRight, IconPackage, IconX } from '../components/icons.jsx';
+import { useToasts } from '../components/Toast.jsx';
 
 export default function MyBids() {
   usePageTitle('My bids');
   const { user } = useAuth();
   const [bids, setBids] = useState([]);
-  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const { addToast } = useToasts();
 
   useEffect(() => {
-    api.listJobs({}).then((d) => {
-      const allBids = [];
-      d.jobs.forEach((j) => {
-        api.getMessages(j.id).catch(() => {});
-      });
-      setBids(allBids);
-    }).catch(() => setBids([]));
-  }, []);
+    async function loadBids() {
+      try {
+        const jobsRes = await api.listJobs({});
+        const allBids = [];
+        for (const job of jobsRes.jobs) {
+          try {
+            const jobDetail = await api.getJob(job.id);
+            if (jobDetail.bids) {
+              for (const bid of jobDetail.bids) {
+                if (bid.carrier_id === user.id) {
+                  allBids.push({ ...bid, job_code: job.job_code });
+                }
+              }
+            }
+          } catch (e) {
+            // skip failed job
+          }
+        }
+        setBids(allBids);
+      } catch (e) {
+        setBids([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadBids();
+  }, [user.id]);
+
+  if (loading) {
+    return (
+      <div className="container-page py-10">
+        <h1 className="font-display text-2xl font-semibold text-ink">My bids</h1>
+        <p className="mt-1 text-sm text-ink-muted">Loading your bids...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="container-page py-10">
@@ -64,9 +95,11 @@ export default function MyBids() {
                           </Button>
                         )}
                         {b.status === 'won' && (
-                          <Button variant="link" size="sm" className="text-sm text-brand-primary">
-                            Track shipment
-                          </Button>
+                          <Link to={`/jobs/${b.job_id}`}>
+                            <Button variant="link" size="sm" className="text-sm text-brand-primary">
+                              Track shipment
+                            </Button>
+                          </Link>
                         )}
                       </td>
                     </tr>
