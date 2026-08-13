@@ -10,6 +10,8 @@ import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import OpenLoads from './pages/OpenLoads.jsx';
 import JobDetail from './pages/JobDetail.jsx';
+import MyBids from './pages/MyBids.jsx';
+import WonJobs from './pages/WonJobs.jsx';
 import Templates from './pages/Templates.jsx';
 import Contracts from './pages/Contracts.jsx';
 import Earnings from './pages/Earnings.jsx';
@@ -60,10 +62,12 @@ export default function App() {
         <Route path="/register" element={<GuestOnly><Register /></GuestOnly>} />
 
         <Route path="/dashboard" element={<RequireAuth roles={['SHIPPER']}><Dashboard /></RequireAuth>} />
-        <Route path="/templates" element={<RequireAuth roles={['SHIPPER']}><Templates /></RequireAuth>} />
+        <Route path"/templates" element={<RequireAuth roles={['SHIPPER']}><Templates /></RequireAuth>} />
         <Route path="/contracts" element={<RequireAuth roles={['SHIPPER']}><Contracts /></RequireAuth>} />
 
         <Route path="/open-loads" element={<RequireAuth roles={['CARRIER']}><OpenLoads /></RequireAuth>} />
+        <Route path="/my-bids" element={<RequireAuth roles={['CARRIER']}><MyBids /></RequireAuth>} />
+        <Route path="/won-jobs" element={<RequireAuth roles={['CARRIER']}><WonJobs /></RequireAuth>} />
         <Route path="/earnings" element={<RequireAuth roles={['CARRIER']}><Earnings /></RequireAuth>} />
 
         <Route path="/admin" element={<RequireAuth roles={['ADMIN']}><Admin /></RequireAuth>} />

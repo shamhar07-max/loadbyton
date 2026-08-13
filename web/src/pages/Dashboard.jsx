@@ -9,6 +9,7 @@ import {
 } from '../lib/constants.js';
 import { Button, Card, Stat, Input, Label, Select, Textarea, EmptyState, StatusBadge, Badge } from '../components/ui.jsx';
 import { IconPlus, IconPackage, IconChevronRight } from '../components/icons.jsx';
+import { useToasts } from '../components/Toast.jsx';
 
 const emptyJob = {
   equipmentType: 'CONTAINER_CHASSIS',
@@ -27,6 +28,7 @@ export default function Dashboard() {
   const [form, setForm] = useState(emptyJob);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const { addToast } = useToasts();
 
   function load() {
     api.analytics().then((d) => setAnalytics(d.analytics)).catch(() => {});
@@ -48,9 +50,19 @@ export default function Dashboard() {
       });
       setForm(emptyJob);
       setShowForm(false);
+      addToast({
+        type: 'status_change',
+        title: 'Job posted',
+        body: `${form.job_code || 'new job'} posted successfully`,
+      });
       load();
     } catch (err) {
       setError(err.message);
+      addToast({
+        type: 'system_message',
+        title: 'Error',
+        body: err.message,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -206,46 +218,55 @@ export default function Dashboard() {
         {jobs.length === 0 ? (
           <EmptyState title="No jobs yet" description="Post your first drayage job to start getting carrier bids." action={<Button onClick={() => setShowForm(true)}>Post a job</Button>} />
         ) : (
-          <div className="card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
-                    <th className="px-5 py-3 font-medium">Job</th>
-                    <th className="px-5 py-3 font-medium">Lane</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
-                    <th className="px-5 py-3 font-medium">Price</th>
-                    <th className="px-5 py-3 font-medium">Deadline</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {jobs.map((j) => (
-                    <tr key={j.id} className="border-b last:border-0 hover:bg-raised" style={{ borderColor: 'var(--border-subtle)' }}>
-                      <td className="px-5 py-3">
-                        <p className="font-mono text-xs text-ink-muted">{j.job_code}</p>
-                        <p className="font-medium text-ink">
-                          {CONTAINER_EQUIPMENT.includes(j.equipment_type) ? `${j.container_size} ${formatLabel(j.container_type)}` : equipmentLabel(j.equipment_type)}
-                        </p>
-                        {(j.container_count > 1 || j.truck_count > 1) && (
-                          <Badge className="mt-1" color="accent">
-                            {j.container_count > 1 ? `×${j.container_count} containers` : `×${j.truck_count} trucks`}
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-ink-secondary">{formatLabel(j.pickup_terminal)} → {formatLabel(j.delivery_area)}</td>
-                      <td className="px-5 py-3"><StatusBadge status={j.status} /></td>
-                      <td className="tabular px-5 py-3 text-ink-secondary">{formatAED(j.agreed_price_aed || j.max_budget_aed)}</td>
-                      <td className="px-5 py-3 text-ink-secondary">{formatDate(j.deadline)}</td>
-                      <td className="px-5 py-3 text-right">
-                        <Link to={`/jobs/${j.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-primary hover:underline">
-                          View <IconChevronRight size={14} />
-                        </Link>
-                      </td>
+          <div className="mt-3">
+            <p className="text-sm text-ink-muted">Filter: 
+              <Select onChange={(e) => {/* filter logic */}}>
+                <option value="all">All</option>
+                <option value="open">Open</option>
+                <option value="awarded">Awarded</option>
+              </Select>
+            </p>
+            <div className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
+                      <th className="px-5 py-3 font-medium">Job</th>
+                      <th className="px-5 py-3 font-medium">Lane</th>
+                      <th className="px-5 py-3 font-medium">Status</th>
+                      <th className="px-5 py-3 font-medium">Price</th>
+                      <th className="px-5 py-3 font-medium">Deadline</th>
+                      <th />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {jobs.map((j) => (
+                      <tr key={j.id} className="border-b last:border-0 hover:bg-raised" style={{ borderColor: 'var(--border-subtle)' }}>
+                        <td className="px-5 py-3">
+                          <p className="font-mono text-xs text-ink-muted">{j.job_code}</p>
+                          <p className="font-medium text-ink">
+                            {CONTAINER_EQUIPMENT.includes(j.equipment_type) ? `${j.container_size} ${formatLabel(j.container_type)}` : equipmentLabel(j.equipment_type)}
+                          </p>
+                          {(j.container_count > 1 || j.truck_count > 1) && (
+                            <Badge className="mt-1" color="accent">
+                              {j.container_count > 1 ? `×${j.container_count} containers` : `×${j.truck_count} trucks`}
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-ink-secondary">{formatLabel(j.pickup_terminal)} → {formatLabel(j.delivery_area)}</td>
+                        <td className="px-5 py-3"><StatusBadge status={j.status} /></td>
+                        <td className="tabular px-5 py-3 text-ink-secondary">{formatAED(j.agreed_price_aed || j.max_budget_aed)}</td>
+                        <td className="px-5 py-3 text-ink-secondary">{formatDate(j.deadline)}</td>
+                        <td className="px-5 py-3 text-right">
+                          <Link to={`/jobs/${j.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-primary hover:underline">
+                            View <IconChevronRight size={14} />
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

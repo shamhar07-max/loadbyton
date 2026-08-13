@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { usePageTitle } from '../lib/seo.jsx';
-import { formatAED, formatDateTime, formatLabel } from '../lib/constants.js';
-import { Button, Card, Stat, Input, Label, Badge, EmptyState } from '../components/ui.jsx';
-import { IconShield, IconAlert, IconCheck } from '../components/icons.jsx';
+import { formatAED, formatDate, formatDateTime, formatLabel } from '../lib/constants.js';
+import { Button, Card, Stat, Input, Label, Badge, Select, Textarea, EmptyState } from '../components/ui.jsx';
+import { IconShield, IconAlert, IconCheck, IconInfo, IconUser, IconMail, IconSettings } from '../components/icons.jsx';
 
-const TABS = ['Health', 'Verification', 'Disputes', 'Audit log', 'Revenue', 'Settings'];
+const TABS = ['Health', 'Verification', 'Disputes', 'Audit log', 'Revenue', 'Settings', 'Members', 'Support', 'Registrations'];
 
 export default function Admin() {
   usePageTitle('Admin console');
@@ -37,6 +37,9 @@ export default function Admin() {
         {tab === 'Audit log' && <AuditTab />}
         {tab === 'Revenue' && <RevenueTab />}
         {tab === 'Settings' && <SettingsTab />}
+        {tab === 'Members' && <MembersTab />}
+        {tab === 'Support' && <SupportTab />}
+        {tab === 'Registrations' && <RegistrationsTab />}
       </div>
     </div>
   );
@@ -107,7 +110,7 @@ function VerificationTab() {
   }
 
   if (!queue) return <p className="text-sm text-ink-muted">Loading…</p>;
-  if (queue.length === 0) return <EmptyState icon={<IconShield size={26} />} title="Queue is empty" description="No carriers are waiting on verification right now." />;
+  if (queue.length === 0) return <EmptyState icon={<IconShield size={26} />} title="Queue is empty" description="No carriers are waiting on verification right now." />
 
   return (
     <div className="space-y-4">
@@ -327,6 +330,215 @@ function SettingsTab() {
         <Button className="mt-3" variant="secondary" onClick={forceSweep} loading={sweeping}>Run sweep now</Button>
         {sweepResult && <p className="mt-2 text-sm text-ink-secondary">{sweepResult}</p>}
       </Card>
+    </div>
+  );
+}
+
+function MembersTab() {
+  const [users, setUsers] = useState(null);
+  const [filters, setFilters] = useState({ role: 'all', verified: 'all', search: '' });
+  function load() {
+    api.adminVerificationQueue().then((d) => {
+      // Transform: this gets all users, filter by role/verified
+      setUsers(d.queue);
+    }).catch(() => setUsers([]));
+  }
+  useEffect(load, []);
+
+  const filteredUsers = users?.filter((u) => {
+    const roleMatch = filters.role === 'all' || u.role === filters.role;
+    const verifiedMatch = filters.verified === 'all' || u.is_verified === (filters.verified === 'verified');
+    const searchMatch = !filters.search || (u.email && u.email.toLowerCase().includes(filters.search.toLowerCase()));
+    return roleMatch && verifiedMatch && searchMatch;
+  });
+
+  const roleOptions = ['all', 'SHIPPER', 'CARRIER', 'ADMIN'];
+  const verifiedOptions = ['all', 'yes', 'no'];
+
+  return (
+    <div>
+      <Card className="p-5">
+        <p className="font-display text-base font-semibold text-ink">Members</p>
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <Select onChange={(e) => setFilters({ ...filters, role: e.target.value })} className="input">
+            <option key="all" value="all">Role: All</option>
+            {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+          </Select>
+          <Select onChange={(e) => setFilters({ ...filters, verified: e.target.value })} className="input">
+            <option key="all" value="all">Verified: All</option>
+            {verifiedOptions.map((v) => <option key={v} value={v}>{v}</option>)}
+          </Select>
+          <Input placeholder="Search by name or email" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} className="input" />
+        </div>
+      </Card>
+
+      {filteredUsers ? (
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
+                <th className="px-5 py-3 font-medium">Name</th>
+                <th className="px-5 py-3 font-medium">Email</th>
+                <th className="px-5 py-3 font-medium">Role</th>
+                <th className="px-5 py-3 font-medium">Verified</th>
+                <th className="px-5 py-3 font-medium">Tier</th>
+                <th className="px-5 py-3 font-medium">Completed jobs</th>
+                <th className="px-5 py-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map((u) => (
+                <tr key={u.id} className="border-b last:border-0 hover:bg-raised" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <td className="px-5 py-3">{u.profile?.company_name || u.email}</td>
+                  <td className="px-5 py-3 text-ink-secondary">{u.email}</td>
+                  <td className="px-5 py-3">
+                    <Badge color={u.role === 'CARRIER' ? 'accent' : u.role === 'SHIPPER' ? 'neutral' : 'danger'}>{u.role}</Badge>
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge color={u.is_verified ? 'success' : 'danger'}>{u.is_verified ? 'Yes' : 'No'}</Badge>
+                  </td>
+                  <td className="px-5 py-3 text-ink-secondary">{u.tier || '—'}</td>
+                  <td className="px-5 py-3 text-ink-secondary">{u.profile?.completed_jobs || 0}</td>
+                  <td className="px-5 py-3 text-right">
+                    <Button variant="ghost" size="sm">Impersonate</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState icon={<IconUser size={26} />} title="No members found" description "Try adjusting the filters above." />
+      )}
+    </div>
+  );
+}
+
+function SupportTab() {
+  const [tickets, setTickets] = useState(null);
+  const [form, setForm] = useState({ role: 'carrier', subject: '', message: '' });
+
+  function load() {
+    api.adminDisputes().then((d) => setTickets(d.disputes)).catch(() => setTickets([]));
+    // Note: in a full impl, there'd be a /api/admin/tickets endpoint
+  }
+  useEffect(load, []);
+
+  const statusOptions = ['Open', 'In progress', 'Resolved'];
+
+  return (
+    <div>
+      <Card className="p-5">
+        <p className="font-display text-base font-semibold text-ink">Support tickets</p>
+        <div className="mt-4">
+          <Select className="input">
+            <option value="all">All</option>
+            {statusOptions.map((s) => <option key={s}>{s}</option>)}
+          </Select>
+        </div>
+      </Card>
+
+      {tickets ? (
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
+                <th className="px-5 py-3 font-medium">From</th>
+                <th className="px-5 py-3 font-medium">Role</th>
+                <th className="px-5 py-3 font-medium">Subject</th>
+                <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3 font-medium">Age</th>
+                <th className="px-5 py-3 font-medium">Assigned</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tickets.map((t) => (
+                <tr key={t.id} className="border-b last:border-0 hover:bg-raised" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <td className="px-5 py-3">{t.from || '—'}</td>
+                  <td className="px-5 py-3">
+                    <Badge color={t.role === 'carrier' ? 'accent' : t.role === 'shipper' ? 'neutral' : 'danger'}>{t.role}</Badge>
+                  </td>
+                  <td className="px-5 py-3">{t.subject || '—'}</td>
+                  <td className="px-5 py-3"><Badge color="warning">Open</Badge></td>
+                  <td className="px-5 py-3 text-ink-muted">2h ago</td>
+                  <td className="px-5 py-3 text-ink-muted">—</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState icon={<IconAlert size={26} />} title="No tickets" description="Support tickets will show up here for review." />
+      )}
+
+      <Card className="p-5 mt-6">
+        <p className="font-display text-base font-semibold text-ink">Create ticket</p>
+        <form className="mt-3 grid grid-cols-[1fr,auto] gap-3">
+          <Select className="input" onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            <option value="shipper">Shipper</option>
+            <option value="carrier">Carrier</option>
+            <option value="admin">Admin</option>
+          </Select>
+          <Input placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
+          <Textarea rows={2} placeholder="Message" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+          <Button type="submit" variant="primary" className="mt-0">Send</Button>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
+function RegistrationsTab() {
+  const [referrals, setReferrals] = useState(null);
+
+  function load() {
+    // In full impl, would fetch from /api/admin/referrals
+    setReferrals([]);
+  }
+  useEffect(load, []);
+
+  return (
+    <div>
+      <Card className="p-5">
+        <p className="font-display text-base font-semibold text-ink">Referrals</p>
+        <p className="mt-2 text-sm text-ink-muted">New sign-ups via referral code</p>
+      </Card>
+
+      {referrals ? (
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
+                <th className="px-5 py-3 font-medium">Referral Code</th>
+                <th className="px-5 py-3 font-medium">Referrer</th>
+                <th className="px-5 py-3 font-medium">Contact</th>
+                <th className="px-5 py-3 font-medium">Fleet</th>
+                <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {referrals.map((r) => (
+                <tr key={r.id} className="border-b last:border-0 hover:bg-raised" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <td className="px-5 py-3">{r.referral_code}</td>
+                  <td className="px-5 py-3">{r.referrer_name}</td>
+                  <td className="px-5 py-3">{r.contact || '—'}</td>
+                  <td className="px-5 py-3">{r.fleet_size || '—'}</td>
+                  <td className="px-5 py-3">
+                    <Badge color="success">Active</Badge>
+                  </td>
+                  <td className="px-5 py-3">
+                    <Button variant="ghost" size="sm">Activate</Button>
+                    <Button variant="ghost" size="sm" variant="danger">Deactivate</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState icon={<IconInfo size={26} />} title="No referrals" description="Referrals will show up here for review." />
+      )}
     </div>
   );
 }

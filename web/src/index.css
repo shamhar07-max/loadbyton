@@ -259,3 +259,73 @@ h1, h2, h3, h4, .font-display {
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Toast notification system                                           */
+/* ------------------------------------------------------------------ */
+
+.toast-container {
+  pointer-events: none;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  flex-direction: column;
+  align-items: center;
+  z-index: 9999;
+}
+
+.toast {
+  pointer-events: auto;
+  width: 420px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--lb-radius-md);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  box-shadow: var(--lb-shadow-md);
+  animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 4s;
+  color: var(--text-primary);
+}
+
+.toast .icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toast .message {
+  flex: 1;
+}
+
+.toast .action {
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.toast:hover .action {
+  opacity: 1;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    pointer-events: none;
+  }
+}

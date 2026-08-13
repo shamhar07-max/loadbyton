@@ -6,6 +6,15 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('loadbyton-theme');
+    return saved === 'dark' ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('loadbyton-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     api
@@ -38,8 +47,29 @@ export function AuthProvider({ children }) {
     return d.user;
   }, []);
 
+  const setWalkthroughStep = useCallback((step: number) => {
+    localStorage.setItem('loadbyton-walkthrough', String(step));
+  }, []);
+
+  const getWalkthroughStep = useCallback(() => {
+    const saved = localStorage.getItem('loadbyton-walkthrough');
+    return saved ? Number(saved) : null;
+  }, []);
+
+  const completeWalkthrough = useCallback(() => {
+    localStorage.setItem('loadbyton-walkthroughFinished', 'true');
+    setWalkthroughStep(3);
+  }, [setWalkthroughStep]);
+
+  const isWalkthroughFinished = useCallback(() => {
+    const finished = localStorage.getItem('loadbyton-walkthroughFinished');
+    return finished === 'true';
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh, setUser }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, register, logout, refresh, theme, setTheme, setWalkthroughStep, getWalkthroughStep, completeWalkthrough, isWalkthroughFinished, userRole: user?.role }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -6,15 +6,21 @@ import { usePageTitle } from '../lib/seo.jsx';
 import { formatAED, formatDate, formatLabel, CONTAINER_EQUIPMENT, equipmentLabel } from '../lib/constants.js';
 import { Card, EmptyState, Badge } from '../components/ui.jsx';
 import { IconAlert, IconMapPin, IconClock, IconChevronRight, IconPackage } from '../components/icons.jsx';
+import { Button } from '../components/ui.jsx';
 
 export default function OpenLoads() {
   usePageTitle('Open loads');
   const { user } = useAuth();
   const [jobs, setJobs] = useState(null);
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     api.listJobs({ status: 'OPEN' }).then((d) => setJobs(d.jobs)).catch(() => setJobs([]));
   }, []);
+
+  const filteredJobs = filter === 'all'
+    ? jobs
+    : jobs?.filter((j) => j.status === filter);
 
   return (
     <div className="container-page py-10">
@@ -28,14 +34,26 @@ export default function OpenLoads() {
         </div>
       )}
 
+      <div className="mt-4">
+        <p className="text-sm text-ink-muted">Filter: 
+          <Select onChange={(e) => setFilter(e.target.value)} className="input w-24">
+            <option value="all">All</option>
+            <option value="open">Open</option>
+            <option value="awarded">Awarded</option>
+            <option value="in_transit">In Transit</option>
+            <option value="delivered">Delivered</option>
+          </Select>
+        </p>
+      </div>
+
       <div className="mt-8">
-        {jobs === null ? (
+        {filteredJobs === null ? (
           <p className="text-sm text-ink-muted">Loading…</p>
-        ) : jobs.length === 0 ? (
+        ) : filteredJobs.length === 0 ? (
           <EmptyState icon={<IconPackage size={28} />} title="No open loads right now" description="New jobs post here as soon as a shipper creates them. Check back shortly." />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {jobs.map((j) => (
+            {filteredJobs.map((j) => (
               <Link to={`/jobs/${j.id}`} key={j.id} className="card block p-5 transition-shadow hover:shadow-md">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -63,7 +81,19 @@ export default function OpenLoads() {
                 <div className="mt-4 flex items-center justify-between border-t pt-3" style={{ borderColor: 'var(--border-subtle)' }}>
                   <p className="tabular text-sm font-semibold text-ink">Budget up to {formatAED(j.max_budget_aed)}</p>
                   <span className="inline-flex items-center gap-1 text-sm font-medium text-brand-primary">
-                    Bid <IconChevronRight size={14} />
+                    {user.is_verified ? (
+                      <Button
+                        variant="link"
+                        onClick={() => addToast({
+                          type: 'bid_received',
+                          title: 'Bid submission',
+                          body: `Place a bid on ${j.job_code}`,
+                        })}
+                        >Bid <IconChevronRight size={14} />
+                      </Button>
+                    ) : (
+                      Bid <IconChevronRight size={14} />
+                    )}
                   </span>
                 </div>
               </Link>
