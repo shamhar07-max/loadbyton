@@ -42,7 +42,7 @@ module.exports = {
         },
       },
       fontFamily: {
-        display: ['"Space Grotesk"', 'ui-sans-serif', 'sans-serif'],
+        display: ['Manrope', 'ui-sans-serif', 'sans-serif'],
         body: ['Inter', 'ui-sans-serif', 'sans-serif'],
         mono: ['"IBM Plex Mono"', 'ui-monospace', '"SF Mono"', 'Menlo', 'monospace'],
       },

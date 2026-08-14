@@ -97,18 +97,20 @@ it never gets confused with the accent doing its actual job.
 
 ## 3. Typography
 
-- **Display — Space Grotesk**, leaning on **600/700** rather than 500 now that
-  the brand is monochrome-first — a lighter weight reads fine against a soft
-  navy, but against near-black-on-white it needs the extra weight to feel
-  intentional rather than thin. Tighten tracking slightly at hero sizes
-  (32px+) for the punchier, more "app" feel this pass is going for, rather
-  than an editorial one. Headlines, page titles, the wordmark, stat numbers.
-  Geometric and a little industrial — it's why it was already the documented
-  convention in the original spec, and it earns its place here: it reads as
-  infrastructure, not a landing-page template, at the sizes a dashboard
-  actually uses it (18–48px), which is where it's distinct from being "the
-  safe AI-generated default" — that reputation comes from using it as body
-  text at paragraph sizes, which Loadbyton never does.
+- **Display — Manrope** (600/700/800). Replaced Space Grotesk in 2026: the
+  prior pass argued Space Grotesk avoided the "safe AI-generated default"
+  read as long as it stayed at display sizes only — in practice, by 2026 it
+  and its immediate peers (Sora, General Sans, Cabinet Grotesk) had become
+  the default display face of AI-product marketing broadly enough that the
+  size argument stopped mattering; the association reads on sight. Manrope
+  sits in a different lineage — semi-condensed, enterprise/fintech-dashboard
+  register rather than consumer-AI-launch register — while keeping the same
+  practical properties that made Space Grotesk work here: geometric enough
+  to read as infrastructure, holds up at 600/700/800 from stat-number sizes
+  down to page titles, tightens cleanly at hero sizes (32px+). Headlines,
+  page titles, the wordmark, stat numbers. Still never used as body text at
+  paragraph sizes — that discipline stays regardless of which face is in
+  the display slot.
 - **Body — Inter** (400/500/600). Everything you read at length: forms, tables,
   descriptions, nav labels.
 - **Mono — IBM Plex Mono.** Reserved for data that lines up: job codes

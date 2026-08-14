@@ -31,7 +31,7 @@ const STRINGS = {
     'nav.features': 'Features',
     'nav.pricing': 'Pricing',
     'nav.about': 'About',
-    'landing.hero.title': 'Stop running freight on WhatsApp and spreadsheets.',
+    'landing.hero.title': 'UAE road freight, run on one verified platform.',
     'landing.hero.subtitle':
       "Loadbyton is the UAE's escrow-backed freight operating system — post a job, get priced bids from verified carriers, and let escrow, tracking, and payouts run themselves. No broker calls. No chasing PODs. No surprise markups.",
     'landing.hero.ctaShipper': 'Post a load',
@@ -62,7 +62,7 @@ const STRINGS = {
     'nav.features': 'المزايا',
     'nav.pricing': 'الأسعار',
     'nav.about': 'من نحن',
-    'landing.hero.title': 'توقف عن إدارة الشحن عبر واتساب وجداول البيانات.',
+    'landing.hero.title': 'الشحن البري في الإمارات، على منصة واحدة موثوقة.',
     'landing.hero.subtitle':
       'لودبايتون هو نظام تشغيل الشحن الإماراتي المدعوم بحساب الضمان — انشر مهمة، واحصل على عروض أسعار من ناقلين موثقين، ودع الضمان والتتبع والمدفوعات تسير تلقائيًا. بلا اتصالات وسطاء، بلا مطاردة إثباتات التسليم، وبلا رسوم مفاجئة.',
     'landing.hero.ctaShipper': 'انشر حمولة',
