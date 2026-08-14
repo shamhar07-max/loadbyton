@@ -330,6 +330,35 @@ addColumn('users', 'email_verify_expires', 'email_verify_expires TEXT');
 addColumn('users', 'password_reset_token_hash', 'password_reset_token_hash TEXT');
 addColumn('users', 'password_reset_expires', 'password_reset_expires TEXT');
 
+// Notification per-type preferences. `type` categorizes every notify()
+// call (bid/award/status/payout/dispute/verification/message) so a user
+// can mute a category; notification_prefs_disabled is a CSV of muted type
+// keys on the user row — a join table would be overkill for a handful of
+// fixed categories toggled per-user, and this reads/writes as one column
+// instead of a multi-row upsert per toggle.
+addColumn('notifications', 'type', "type TEXT NOT NULL DEFAULT 'system'");
+addColumn('users', 'notification_prefs_disabled', "notification_prefs_disabled TEXT NOT NULL DEFAULT ''");
+
+// Real file upload for job documents/POD. storage_path is set when the file
+// was uploaded through the app (base64 JSON body, decoded and written under
+// UPLOADS_DIR in server/index.js) and served back via an access-controlled
+// route that re-checks isParticipantOrBidder on every read; file_url alone
+// (no storage_path) means a legacy/manual external link with no local file.
+addColumn('job_documents', 'storage_path', 'storage_path TEXT');
+addColumn('job_documents', 'mime_type', 'mime_type TEXT');
+
+// Optional precise pickup/delivery pin (free OpenStreetMap + Nominatim, no
+// API key — see web/src/components/LocationPicker.jsx) on top of the
+// existing pickup_terminal/delivery_area enums, which still drive lane rate
+// lookups. Nullable: most jobs will only ever have the enum values, same as
+// before this existed.
+addColumn('jobs', 'pickup_lat', 'pickup_lat REAL');
+addColumn('jobs', 'pickup_lng', 'pickup_lng REAL');
+addColumn('jobs', 'pickup_address_detail', 'pickup_address_detail TEXT');
+addColumn('jobs', 'delivery_lat', 'delivery_lat REAL');
+addColumn('jobs', 'delivery_lng', 'delivery_lng REAL');
+addColumn('jobs', 'delivery_address_detail', 'delivery_address_detail TEXT');
+
 // ---------------------------------------------------------------------------
 // audit_log is append-only: DB triggers hard-abort UPDATE/DELETE. This makes
 // the audit trail tamper-evident even against a compromised app process.

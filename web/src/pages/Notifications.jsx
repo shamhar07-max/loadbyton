@@ -5,19 +5,52 @@ import { usePageTitle } from '../lib/seo.jsx';
 import { formatDateTime } from '../lib/constants.js';
 import { Button, Card, EmptyState } from '../components/ui.jsx';
 import { IconBell } from '../components/icons.jsx';
+import { useToasts } from '../components/Toast.jsx';
+
+const TYPE_LABELS = {
+  bid: 'New bids',
+  award: 'Bid accepted / rejected',
+  status: 'Shipment status updates',
+  payout: 'Payouts',
+  dispute: 'Disputes',
+  verification: 'Carrier verification',
+  message: 'Messages',
+};
 
 export default function Notifications() {
   usePageTitle('Notifications');
   const [items, setItems] = useState(null);
+  const [prefs, setPrefs] = useState(null);
+  const [prefsBusy, setPrefsBusy] = useState(false);
+  const { addToast } = useToasts();
 
   function load() {
     api.notifications().then((d) => setItems(d.notifications)).catch(() => setItems([]));
   }
   useEffect(load, []);
+  useEffect(() => {
+    api.notificationPreferences().then(setPrefs).catch(() => setPrefs({ types: [], disabled: [] }));
+  }, []);
 
   async function markRead() {
     await api.markNotificationsRead();
     load();
+  }
+
+  async function toggleType(type) {
+    const disabled = prefs.disabled.includes(type)
+      ? prefs.disabled.filter((t) => t !== type)
+      : [...prefs.disabled, type];
+    setPrefs({ ...prefs, disabled });
+    setPrefsBusy(true);
+    try {
+      await api.updateNotificationPreferences(disabled);
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not save preference', body: err.message });
+      load();
+    } finally {
+      setPrefsBusy(false);
+    }
   }
 
   return (
@@ -26,6 +59,27 @@ export default function Notifications() {
         <h1 className="font-display text-2xl font-semibold text-ink">Notifications</h1>
         {items && items.some((n) => !n.is_read) && <Button variant="secondary" onClick={markRead}>Mark all read</Button>}
       </div>
+
+      {prefs && prefs.types.length > 0 && (
+        <Card className="mt-6">
+          <Card.Content>
+            <p className="text-sm font-medium text-ink">Notify me about</p>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {prefs.types.map((type) => (
+                <label key={type} className="flex items-center gap-2 text-sm text-ink-secondary">
+                  <input
+                    type="checkbox"
+                    checked={!prefs.disabled.includes(type)}
+                    disabled={prefsBusy}
+                    onChange={() => toggleType(type)}
+                  />
+                  {TYPE_LABELS[type] || type}
+                </label>
+              ))}
+            </div>
+          </Card.Content>
+        </Card>
+      )}
 
       <div className="mt-6">
         {items === null ? (

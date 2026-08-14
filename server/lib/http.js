@@ -46,7 +46,11 @@ function securityHeaders(req, res, next) {
   }
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
+    // img-src/connect-src carve-outs are for the free OpenStreetMap +
+    // Nominatim map picker (web/src/components/LocationPicker.jsx) — tile
+    // images load from *.tile.openstreetmap.org, and the browser calls
+    // nominatim.openstreetmap.org directly for search/reverse-geocode.
+    "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self' https://nominatim.openstreetmap.org; frame-ancestors 'none'; base-uri 'self'"
   );
   // Loadbyton never asks for any of these browser capabilities — deny them
   // outright rather than leaving the default (permissive) policy in place.

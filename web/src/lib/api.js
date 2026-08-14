@@ -57,7 +57,13 @@ export const api = {
     return get(`/jobs${suffix}`);
   },
   createJob: (body) => post('/jobs', body),
-  myBids: () => get('/bids/mine'),
+  importJobs: (jobs) => post('/jobs/import', { jobs }),
+  editJob: (id, body) => patch(`/jobs/${id}`, body),
+  myBids: (params = {}) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''));
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return get(`/bids/mine${suffix}`);
+  },
   withdrawBid: (id) => post(`/bids/${id}/withdraw`),
   getJob: (id) => get(`/jobs/${id}`),
   placeBid: (id, body) => post(`/jobs/${id}/bids`, body),
@@ -67,6 +73,8 @@ export const api = {
   setStatus: (id, status) => patch(`/jobs/${id}/status`, { status }),
   submitPod: (id, body) => post(`/jobs/${id}/pod`, body),
   track: (id) => get(`/jobs/${id}/track`),
+  disputeJob: (id, reason) => post(`/jobs/${id}/dispute`, { reason }),
+  backloadMatches: (id) => get(`/jobs/${id}/backload-matches`),
   addDocument: (id, body) => post(`/jobs/${id}/documents`, body),
   rateJob: (id, body) => post(`/jobs/${id}/rating`, body),
   getMessages: (id) => get(`/jobs/${id}/messages`),
@@ -83,11 +91,14 @@ export const api = {
   invoices: () => get('/invoices'),
   notifications: () => get('/notifications'),
   markNotificationsRead: () => post('/notifications/read'),
+  notificationPreferences: () => get('/notifications/preferences'),
+  updateNotificationPreferences: (disabled) => patch('/notifications/preferences', { disabled }),
 
   // admin
   adminHealth: () => get('/admin/health'),
   adminVerificationQueue: () => get('/admin/verification'),
   adminVerify: (id, body) => post(`/admin/verify/${id}`, body),
+  adminVerifyBulk: (ids, action) => post('/admin/verify-bulk', { ids, action }),
   adminConfirmReceipt: (jobId) => post('/admin/confirm-receipt', { jobId }),
   adminAudit: () => get('/admin/audit'),
   adminDisputes: () => get('/admin/disputes'),

@@ -125,11 +125,19 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
     "requiresReefer": false, "requiresHazmat": false,
     "containerCount": 1, "truckCount": 1,
     "freeTimeDays": 5, "demurrageRateAed": 400,
-    "templateId": null, "contractLaneId": null, "notes": "..."
+    "templateId": null, "contractLaneId": null, "notes": "...",
+    "pickupLat": 25.0092, "pickupLng": 55.0617, "pickupAddressDetail": "Jebel Ali Port Gate 4",
+    "deliveryLat": 25.1288, "deliveryLng": 55.2115, "deliveryAddressDetail": "Al Quoz Industrial 3, Warehouse 12"
   }
   ```
   `equipmentType` defaults to `CONTAINER_CHASSIS` if omitted/invalid — one of the 12 values in `DATA_MODEL.md`'s `jobs.equipment_type`. `containerSize`/`containerType` are only validated (and required) when `equipmentType` is `CONTAINER_CHASSIS` or `REEFER_TRUCK`; for every other equipment type the server stores `'N/A'`/`'GENERAL'` regardless of what's sent, and `notes` becomes the required cargo description instead. `containerCount`/`truckCount` default to `1` — raise either for a volume inquiry (one job, one award, covering the stated batch).
+  `pickupLat`/`pickupLng`/`deliveryLat`/`deliveryLng` are an optional precise pin from the free OpenStreetMap+Nominatim picker (`web/src/components/LocationPicker.jsx`) on top of the required `pickupTerminal`/`deliveryArea` enums, which still drive lane rate lookups — **400** if only one of a lat/lng pair is sent, or the pair falls outside a loose UAE bounding box.
 - **201** `{ job }` with generated `job_code` (e.g. `LBT-DXB-2608-4921`), status `OPEN`.
+
+### `POST /api/jobs/import`
+- **Auth:** `SHIPPER`
+- **Body:** `{ jobs: [...] }` — array (max 200) of objects in the same shape as `POST /api/jobs`'s body. CSV parsing happens client-side (`web/src/lib/csv.js`); this route only ever sees JSON.
+- **201** `{ results: [{ row, ok, jobCode?, jobId?, error? }], created, failed }` — each row is validated/inserted independently (same `createJobFromBody` logic as the single-job route), so one bad row doesn't sink the batch.
 
 ### `GET /api/jobs/:id`
 - **Auth:** session (job participant, or admin; `OPEN` jobs visible to carriers)
@@ -172,17 +180,26 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
 
 ### `POST /api/jobs/:id/pod`
 - **Auth:** `CARRIER` (awarded), job `IN_TRANSIT`
-- **Body:** `{ document?: { docType, title, fileUrl } }`
-- **200** `{ job }` — sets `delivered_at`, status `DELIVERED`, starts the auto-release clock (`auto_release_hours`, default 24 h). A POD document is recorded in `job_documents`.
+- **Body:** `{ document?: { docType, title, fileUrl } | { docType, title, fileBase64, mimeType } }` — either an external `fileUrl`, or a real upload as base64 (`fileBase64`) with `mimeType` one of `image/jpeg`\|`image/png`\|`image/webp`\|`application/pdf`, up to 5MB.
+- **200** `{ job }` — sets `delivered_at`, status `DELIVERED`, starts the auto-release clock (`auto_release_hours`, default 24 h). A POD document is recorded in `job_documents`; an uploaded file is validated and written to disk before the job status changes, so a bad upload 400s without leaving the job DELIVERED.
 
 ### `GET /api/jobs/:id/track`
 - **Auth:** session (participant)
 - **200** `{ job, shipperName, carrierName, statusIndex, canProgress, demurrageExposure, hoursSinceDelivered, autoReleaseAt, geofence: { pickup, delivery, atPickup, atDelivery } }` — live tracking view for the detail page (`demurrageExposure` = free-time days exceeded × rate; `autoReleaseAt` = `delivered_at + auto_release_hours`).
 
+### `GET /api/jobs/:id/backload-matches`
+- **Auth:** `CARRIER`, must be this job's own `carrier_id`, job status one of `AWARDED`\|`PICKED_UP`\|`IN_TRANSIT`\|`DELIVERED`\|`COMPLETED`
+- **200** `{ matches: [{ ...job, matchType: "coords"|"area", distanceKm }] }` — up to 10 `OPEN` jobs that make a good return leg after this one, ranked by real haversine distance (`matchType: "coords"`) when both this job's `delivery_lat/lng` and a candidate's `pickup_lat/lng` are set, falling back to `matchType: "area"` (same emirate, via a real `TERMINALS`/`AREAS` → emirate mapping — not a distance) when a pin is missing on either side. Coordinate matches always sort ahead of area matches.
+- **403** if the job isn't the caller's own award, or isn't in an eligible status yet.
+
 ### `POST /api/jobs/:id/documents`
 - **Auth:** participant
-- **Body:** `{ docType: "CUSTOMS"|"RECEIPT"|"POD"|"LICENCE"|"INSURANCE"|"OTHER", title, fileUrl }`
+- **Body:** `{ docType: "CUSTOMS"|"RECEIPT"|"POD"|"LICENCE"|"INSURANCE"|"OTHER", title, fileUrl }` or `{ docType, title, fileBase64, mimeType }` for a real upload (same constraints as `/pod` above).
 - **201** `{ ok: true }` — appended to `job_documents` (the persistent per-job document/customs thread).
+
+### `GET /api/jobs/:id/documents/:docId/file`
+- **Auth:** participant or bidder (`isParticipantOrBidder`)
+- **200** the file bytes (`Content-Type` from the stored `mime_type`) for an uploaded document, or a `302` redirect to `file_url` for a legacy external link.
 
 ### `POST /api/jobs/:id/rating`
 - **Auth:** participant, terminal job
@@ -247,6 +264,10 @@ All routes below require `auth(['ADMIN'])`.
 ### `POST /api/admin/verify/:id`
 - **Body:** `{ action: "approve" | "reject", iban?: string }` — approve requires an IBAN.
 - **200** `{ ok, user }` — marks verified, stores IBAN (payout destination), sets `verified_at`, audits + notifies the carrier.
+
+### `POST /api/admin/verify-bulk`
+- **Body:** `{ ids: number[] (max 100), action: "approve" | "reject" }` — no per-carrier IBAN input; a bulk `approve` only succeeds for a carrier that already has one on file.
+- **200** `{ results: [{ id, ok, error? }], succeeded, failed }` — each id is processed independently through the same logic as the single-carrier route, so one failure (usually a missing IBAN) doesn't block the rest of the batch.
 
 ### `POST /api/admin/confirm-receipt`
 - **Body:** `{ jobId }` — moves escrow `HELD → FUNDED` once funds are actually received (audited).

@@ -43,7 +43,9 @@ app.disable('x-powered-by');
 // without this, every request behind a proxy shares one IP and the rate
 // limiter below would throttle all users as if they were one.
 app.set('trust proxy', 1);
-app.use(express.json());
+// 8mb covers a 5MB (MAX_UPLOAD_BYTES) file at its ~33% base64 inflation plus
+// JSON overhead; every other route's body is a few KB at most.
+app.use(express.json({ limit: '8mb' }));
 app.use(cookieParser);
 app.use(requestId);
 app.use(securityHeaders);
@@ -78,6 +80,39 @@ const CONTAINER_TYPES = ['DRY', 'REEFER', 'HAZMAT', 'OPEN_TOP', 'FLAT_RACK'];
 const DOC_TYPES = ['CUSTOMS', 'RECEIPT', 'POD', 'LICENCE', 'INSURANCE', 'OTHER'];
 const STATUS_ORDER = ['DRAFT', 'OPEN', 'AWARDED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
 
+// Real file upload for job documents/POD photos. Sent as base64 in the JSON
+// body (not multipart) so this needs no new dependency — express.json()
+// already parses it. Stored under UPLOADS_DIR, which sits next to the
+// sqlite file so both live on the same Render persistent disk (DB_PATH's
+// directory is /data in production, server/data locally).
+const UPLOADS_DIR = path.join(path.dirname(process.env.DB_PATH || path.join(__dirname, 'data', 'loadbyton.db')), 'uploads');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+const ALLOWED_UPLOAD_MIME_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' };
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+// Decodes+validates a base64 upload and writes it under UPLOADS_DIR/<jobId>/.
+// Throws { status, message } (caught by the route) on any validation failure
+// so every call site gets the same 400s without duplicating the checks.
+function saveUploadedFile(jobId, mimeType, base64) {
+  const ext = ALLOWED_UPLOAD_MIME_TYPES[mimeType];
+  if (!ext) throw { status: 400, message: `mimeType must be one of: ${Object.keys(ALLOWED_UPLOAD_MIME_TYPES).join(', ')}` };
+  if (typeof base64 !== 'string' || !base64) throw { status: 400, message: 'fileBase64 is required' };
+  let buffer;
+  try {
+    buffer = Buffer.from(base64, 'base64');
+  } catch {
+    throw { status: 400, message: 'fileBase64 is not valid base64' };
+  }
+  if (!buffer.length || buffer.length > MAX_UPLOAD_BYTES) {
+    throw { status: 400, message: `File must be between 1 byte and ${MAX_UPLOAD_BYTES / (1024 * 1024)}MB` };
+  }
+  const jobDir = path.join(UPLOADS_DIR, String(jobId));
+  fs.mkdirSync(jobDir, { recursive: true });
+  const filename = `${crypto.randomUUID()}.${ext}`;
+  fs.writeFileSync(path.join(jobDir, filename), buffer);
+  return { storagePath: `${jobId}/${filename}`, mimeType };
+}
+
 // UAE mobile: 05XXXXXXXX, +9715XXXXXXXX, or 9715XXXXXXXX — loose on purpose,
 // this only guards against an obviously-wrong value at the API boundary.
 const UAE_MOBILE_RE = /^(\+?971|0)?5\d{8}$/;
@@ -85,6 +120,36 @@ function normalizeUaeMobile(raw) {
   const digits = String(raw || '').replace(/[\s-]/g, '');
   return UAE_MOBILE_RE.test(digits) ? digits : null;
 }
+
+// Loose UAE-region bounding box (with margin) for the optional map pin —
+// just enough to reject an obviously wrong value (e.g. lat/lng swapped),
+// not a precise border check.
+function isValidUaeLatLng(lat, lng) {
+  return Number.isFinite(lat) && Number.isFinite(lng) && lat >= 22 && lat <= 27 && lng >= 51 && lng <= 57;
+}
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Real UAE geography, not a heuristic — every value in TERMINALS/AREAS sits
+// unambiguously in one emirate, mirroring web/src/lib/constants.js's
+// TERMINAL_INFO (which only covers terminals; this adds the delivery-area
+// side so backload matching below can fall back to "same emirate" when a
+// job has no map pin).
+const TERMINAL_EMIRATE = {
+  JEBEL_ALI_T1: 'Dubai', JEBEL_ALI_T2: 'Dubai', JEBEL_ALI_T4: 'Dubai',
+  KHALIFA_PORT: 'Abu Dhabi', PORT_KHALID: 'Sharjah', FUJAIRAH_PORT: 'Fujairah',
+};
+const AREA_EMIRATE = {
+  AL_QUOZ: 'Dubai', JAFZA_SOUTH: 'Dubai', DUBAI_SOUTH: 'Dubai', DIP: 'Dubai', AL_QUSAIS: 'Dubai',
+  MUSAFFAH: 'Abu Dhabi', SHARJAH_INDUSTRIAL: 'Sharjah', FUJAIRAH_FREEZONE: 'Fujairah',
+};
 
 // gstack review F2: length is the one password rule NIST 800-63B actually
 // recommends enforcing — no arbitrary symbol/number complexity theater.
@@ -171,9 +236,29 @@ function writeAudit(req, { userId = null, action, details = null, entityType = n
   ).run(userId, action, details, entityType, entityId, beforeState, afterState, req ? req.requestId : null);
 }
 
-function notify(userId, title, body, jobId = null) {
+// Fixed category set — every notify() call site below is tagged with one
+// of these, and a user can mute categories via
+// PATCH /api/notifications/preferences (users.notification_prefs_disabled,
+// a CSV of muted keys). 'system' is the untagged fallback and deliberately
+// not mutable — account-level notices shouldn't be silenceable.
+const NOTIFICATION_TYPES = ['bid', 'award', 'status', 'payout', 'dispute', 'verification', 'message'];
+
+function notify(userId, title, body, jobId = null, type = 'system') {
   if (!userId) return;
-  db.prepare('INSERT INTO notifications (user_id, title, body, job_id) VALUES (?,?,?,?)').run(userId, title, body, jobId);
+  if (type !== 'system') {
+    const user = db.prepare('SELECT notification_prefs_disabled FROM users WHERE id=?').get(userId);
+    const disabled = user ? user.notification_prefs_disabled.split(',').filter(Boolean) : [];
+    if (disabled.includes(type)) return;
+  }
+  db.prepare('INSERT INTO notifications (user_id, title, body, job_id, type) VALUES (?,?,?,?,?)').run(userId, title, body, jobId, type);
+}
+
+// Self-serve dispute filing needs *someone* on the admin side to actually
+// see it — there's no "notify all admins" primitive elsewhere in this file
+// because every prior dispute was admin-opened (the admin already knew).
+function notifyAdmins(title, body, jobId = null, type = 'dispute') {
+  const admins = db.prepare(`SELECT id FROM users WHERE role='ADMIN'`).all();
+  for (const a of admins) notify(a.id, title, body, jobId, type);
 }
 
 function isParticipantOrBidder(job, user) {
@@ -326,8 +411,8 @@ function runAutoReleaseSweep(req) {
         beforeState: 'HELD',
         afterState: 'RELEASED',
       });
-      notify(job.shipper_id, 'Payout auto-released', `${job.job_code} funds were released ${auto_release_hours}h after delivery.`, job.id);
-      notify(job.carrier_id, 'Funds on the way', `Your payout for ${job.job_code} was auto-released.`, job.id);
+      notify(job.shipper_id, 'Payout auto-released', `${job.job_code} funds were released ${auto_release_hours}h after delivery.`, job.id, 'payout');
+      notify(job.carrier_id, 'Funds on the way', `Your payout for ${job.job_code} was auto-released.`, job.id, 'payout');
       db.exec('COMMIT');
       released++;
     } catch (e) {
@@ -774,16 +859,36 @@ app.get('/api/public/market', (req, res) => {
 // 4. Jobs & the marketplace
 // =============================================================================
 
+const BID_SORT_COLUMNS = {
+  date_desc: 'b.created_at DESC',
+  date_asc: 'b.created_at ASC',
+  price_desc: 'b.amount_aed DESC',
+  price_asc: 'b.amount_aed ASC',
+};
+
 app.get('/api/bids/mine', auth(['CARRIER']), (req, res) => {
+  const { limit, offset, sort, q } = req.query;
+  const lim = Math.max(1, Math.min(Number(limit) || 50, 200));
+  const off = Math.max(0, Number(offset) || 0);
+  const orderBy = BID_SORT_COLUMNS[sort] || BID_SORT_COLUMNS.date_desc;
+  let where = 'b.carrier_id = ?';
+  const params = [req.user.id];
+  if (q && q.trim()) {
+    where += ' AND (j.job_code LIKE ? OR j.delivery_address LIKE ?)';
+    const needle = `%${q.trim()}%`;
+    params.push(needle, needle);
+  }
+  const total = db.prepare(`SELECT COUNT(*) c FROM bids b JOIN jobs j ON j.id = b.job_id WHERE ${where}`).get(...params).c;
   const bids = db
     .prepare(
-      `SELECT b.*, j.job_code, j.pickup_terminal, j.delivery_area, j.status as job_status
+      `SELECT b.*, j.job_code, j.pickup_terminal, j.delivery_area, j.delivery_address, j.status as job_status, sp.rating_avg as shipper_rating
        FROM bids b JOIN jobs j ON j.id = b.job_id
-       WHERE b.carrier_id = ?
-       ORDER BY b.created_at DESC`
+       LEFT JOIN profiles sp ON sp.user_id = j.shipper_id
+       WHERE ${where}
+       ORDER BY ${orderBy} LIMIT ? OFFSET ?`
     )
-    .all(req.user.id);
-  res.json({ bids });
+    .all(...params, lim, off);
+  res.json({ bids, total, limit: lim, offset: off });
 });
 
 app.post('/api/bids/:id/withdraw', auth(['CARRIER']), (req, res) => {
@@ -797,14 +902,26 @@ app.post('/api/bids/:id/withdraw', auth(['CARRIER']), (req, res) => {
   res.json({ ok: true, bid: updated });
 });
 
+// Sort whitelist — never interpolate the client's `sort` string directly
+// into ORDER BY (that's a SQL-injection surface even with prepared
+// statements, since placeholders can't parameterize identifiers/direction).
+const JOB_SORT_COLUMNS = {
+  date_desc: 'jobs.created_at DESC',
+  date_asc: 'jobs.created_at ASC',
+  price_desc: 'COALESCE(jobs.agreed_price_aed, jobs.max_budget_aed) DESC',
+  price_asc: 'COALESCE(jobs.agreed_price_aed, jobs.max_budget_aed) ASC',
+  deadline_asc: 'jobs.deadline ASC',
+  deadline_desc: 'jobs.deadline DESC',
+};
+
 app.get('/api/jobs', auth(), (req, res) => {
-  const { status, limit, offset, mine } = req.query;
+  const { status, limit, offset, mine, sort, q, equipmentType } = req.query;
   // gstack review F12: negative limit passed through to SQLite's LIMIT
   // clause unclamped (LIMIT -1 means "no limit" in SQLite) — main's `mine`
   // param (F19, a different/better fix than the client-side limit:200 bump
   // this branch used) doesn't touch this, so both fixes are needed here.
   const lim = Math.max(1, Math.min(Number(limit) || 50, 200));
-  const off = Number(offset) || 0;
+  const off = Math.max(0, Number(offset) || 0);
   let where = '1=1';
   const params = [];
   if (req.user.role === 'SHIPPER') {
@@ -819,18 +936,62 @@ app.get('/api/jobs', auth(), (req, res) => {
     params.push(req.user.id);
   }
   if (status) {
-    where += ' AND status = ?';
-    params.push(status);
+    // Comma-separated list support (e.g. "AWARDED,PICKED_UP,IN_TRANSIT") —
+    // added so WonJobs' "active" set (several statuses at once) can use
+    // real server-side pagination instead of over-fetching everything and
+    // filtering client-side. Still fully parameterized either way.
+    const statuses = String(status).split(',').map((s) => s.trim()).filter(Boolean);
+    if (statuses.length) {
+      where += ` AND status IN (${statuses.map(() => '?').join(',')})`;
+      params.push(...statuses);
+    }
   }
-  params.push(lim, off);
-  const jobs = db.prepare(`SELECT * FROM jobs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params);
-  res.json({ jobs });
+  if (equipmentType && EQUIPMENT_TYPES.includes(equipmentType)) {
+    where += ' AND equipment_type = ?';
+    params.push(equipmentType);
+  }
+  // Search — job code, delivery address, notes, terminal/area. LIKE against
+  // a handful of TEXT columns is plenty at this table size; a real search
+  // index would only start mattering at a scale this app isn't at yet.
+  if (q && q.trim()) {
+    where += ' AND (job_code LIKE ? OR delivery_address LIKE ? OR notes LIKE ? OR pickup_terminal LIKE ? OR delivery_area LIKE ?)';
+    const needle = `%${q.trim()}%`;
+    params.push(needle, needle, needle, needle, needle);
+  }
+  const orderBy = JOB_SORT_COLUMNS[sort] || JOB_SORT_COLUMNS.date_desc;
+
+  // Total count for real pagination (page X of Y), not just "was there a
+  // next page" — same WHERE, no LIMIT/OFFSET, params array cloned before
+  // the LIMIT/OFFSET values are appended for the row query below.
+  const total = db.prepare(`SELECT COUNT(*) c FROM jobs WHERE ${where}`).get(...params).c;
+
+  const rowParams = [...params, lim, off];
+  // Ratings-on-rows: a shipper deciding whether to award, or a carrier
+  // scanning open loads, previously had no rating signal without opening
+  // the job — the rating only ever showed on the public carrier directory.
+  // LEFT JOIN (not INNER) because a job in DRAFT/OPEN may have no carrier
+  // yet, and a shipper always has a profile but the join must not drop the
+  // job row if either side is briefly missing.
+  const jobs = db
+    .prepare(
+      `SELECT jobs.*, sp.rating_avg as shipper_rating, cp.rating_avg as carrier_rating
+       FROM jobs
+       LEFT JOIN profiles sp ON sp.user_id = jobs.shipper_id
+       LEFT JOIN profiles cp ON cp.user_id = jobs.carrier_id
+       WHERE ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`
+    )
+    .all(...rowParams);
+  res.json({ jobs, total, limit: lim, offset: off });
 });
 
-app.post('/api/jobs', auth(['SHIPPER']), writeLimiter, requireSeatRole(['OPS']), (req, res) => {
-  const b = req.body || {};
+// Shared by POST /api/jobs and the CSV-import loop in POST /api/jobs/import
+// below, so both paths validate and insert identically — throws
+// { status, message } (matching sendError's shape) on any validation
+// failure instead of writing to res directly, so the caller decides whether
+// that's a single 400 or one row in a bulk-import report.
+function createJobFromBody(b, req) {
   const required = ['pickupTerminal', 'deliveryArea', 'deliveryAddress', 'readyAt', 'deadline'];
-  for (const f of required) if (!b[f]) return sendError(res, 400, `${f} is required`);
+  for (const f of required) if (!b[f]) throw { status: 400, message: `${f} is required` };
 
   const equipmentType = EQUIPMENT_TYPES.includes(b.equipmentType) ? b.equipmentType : 'CONTAINER_CHASSIS';
   const needsContainer = CONTAINER_EQUIPMENT.includes(equipmentType);
@@ -838,16 +999,29 @@ app.post('/api/jobs', auth(['SHIPPER']), writeLimiter, requireSeatRole(['OPS']),
   let containerSize = 'N/A';
   let containerType = 'GENERAL';
   if (needsContainer) {
-    if (!b.containerSize || !CONTAINER_SIZES.includes(b.containerSize)) return sendError(res, 400, 'Invalid containerSize');
-    if (!b.containerType || !CONTAINER_TYPES.includes(b.containerType)) return sendError(res, 400, 'Invalid containerType');
+    if (!b.containerSize || !CONTAINER_SIZES.includes(b.containerSize)) throw { status: 400, message: 'Invalid containerSize' };
+    if (!b.containerType || !CONTAINER_TYPES.includes(b.containerType)) throw { status: 400, message: 'Invalid containerType' };
     containerSize = b.containerSize;
     containerType = b.containerType;
   } else if (!b.notes) {
-    return sendError(res, 400, 'cargoDescription (notes) is required for non-container equipment');
+    throw { status: 400, message: 'cargoDescription (notes) is required for non-container equipment' };
   }
 
   const containerCount = Math.max(1, Number(b.containerCount) || 1);
   const truckCount = Math.max(1, Number(b.truckCount) || 1);
+
+  // Optional map pin (see LocationPicker.jsx) — reject silently-wrong values
+  // rather than trusting whatever the client sends, same as any other field.
+  const pickupLat = b.pickupLat !== undefined ? Number(b.pickupLat) : null;
+  const pickupLng = b.pickupLng !== undefined ? Number(b.pickupLng) : null;
+  if ((pickupLat !== null || pickupLng !== null) && !isValidUaeLatLng(pickupLat, pickupLng)) {
+    throw { status: 400, message: 'pickupLat/pickupLng must be valid UAE coordinates' };
+  }
+  const deliveryLat = b.deliveryLat !== undefined ? Number(b.deliveryLat) : null;
+  const deliveryLng = b.deliveryLng !== undefined ? Number(b.deliveryLng) : null;
+  if ((deliveryLat !== null || deliveryLng !== null) && !isValidUaeLatLng(deliveryLat, deliveryLng)) {
+    throw { status: 400, message: 'deliveryLat/deliveryLng must be valid UAE coordinates' };
+  }
 
   let code = jobCode();
   while (db.prepare('SELECT 1 FROM jobs WHERE job_code=?').get(code)) code = jobCode();
@@ -856,8 +1030,9 @@ app.post('/api/jobs', auth(['SHIPPER']), writeLimiter, requireSeatRole(['OPS']),
     .prepare(
       `INSERT INTO jobs (job_code, shipper_id, contract_lane_id, template_id, container_size, container_type, container_number,
          pickup_terminal, delivery_area, delivery_address, ready_at, deadline, max_budget_aed, status, escrow_status,
-         requires_reefer, requires_hazmat, free_time_days, demurrage_rate_aed, notes, equipment_type, container_count, truck_count)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'OPEN','PENDING',?,?,?,?,?,?,?,?)`
+         requires_reefer, requires_hazmat, free_time_days, demurrage_rate_aed, notes, equipment_type, container_count, truck_count,
+         pickup_lat, pickup_lng, pickup_address_detail, delivery_lat, delivery_lng, delivery_address_detail)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'OPEN','PENDING',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     )
     .run(
       code,
@@ -880,12 +1055,129 @@ app.post('/api/jobs', auth(['SHIPPER']), writeLimiter, requireSeatRole(['OPS']),
       b.notes || null,
       equipmentType,
       containerCount,
-      truckCount
+      truckCount,
+      pickupLat,
+      pickupLng,
+      b.pickupAddressDetail || null,
+      deliveryLat,
+      deliveryLng,
+      b.deliveryAddressDetail || null
     );
   const jobId = Number(result.lastInsertRowid);
   writeAudit(req, { userId: req.actorId, action: 'JOB_CREATE', details: `${code} posted`, entityType: 'job', entityId: jobId, afterState: 'OPEN' });
-  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
-  res.status(201).json({ job });
+  return db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+}
+
+app.post('/api/jobs', auth(['SHIPPER']), writeLimiter, requireSeatRole(['OPS']), (req, res) => {
+  try {
+    const job = createJobFromBody(req.body || {}, req);
+    res.status(201).json({ job });
+  } catch (e) {
+    if (e.status) return sendError(res, e.status, e.message);
+    throw e;
+  }
+});
+
+// CSV job import — a shipper with recurring lanes posts many jobs at once
+// instead of the create form one row at a time. Parsing happens client-side
+// (web/src/lib/csv.js) so this route just takes an array of the same shape
+// POST /api/jobs takes; each row is independent (no all-or-nothing
+// transaction) so one bad row doesn't sink an otherwise-good batch — the
+// response reports per-row success/failure for the UI to show inline.
+const JOB_IMPORT_MAX_ROWS = 200;
+app.post('/api/jobs/import', auth(['SHIPPER']), writeLimiter, requireSeatRole(['OPS']), (req, res) => {
+  const rows = (req.body || {}).jobs;
+  if (!Array.isArray(rows) || rows.length === 0) return sendError(res, 400, 'jobs must be a non-empty array');
+  if (rows.length > JOB_IMPORT_MAX_ROWS) return sendError(res, 400, `Cannot import more than ${JOB_IMPORT_MAX_ROWS} jobs at once`);
+
+  const results = rows.map((row, i) => {
+    try {
+      const job = createJobFromBody(row || {}, req);
+      return { row: i + 1, ok: true, jobCode: job.job_code, jobId: job.id };
+    } catch (e) {
+      return { row: i + 1, ok: false, error: e.message || 'Unknown error' };
+    }
+  });
+  const created = results.filter((r) => r.ok).length;
+  res.status(201).json({ results, created, failed: results.length - created });
+});
+
+// Job editing — previously the only options after posting were view or
+// cancel, so a typo in the address meant cancelling and re-losing every
+// bid. Editable only while OPEN and with no live (PENDING) bid yet — once
+// a carrier has bid against a specific spec, changing that spec out from
+// under them is exactly the bait-and-switch this restriction exists to
+// prevent. Deliberately excludes equipmentType/containerSize/containerType:
+// those are structural (a REEFER_TRUCK job becoming a TRIPPER job is a
+// different job, not an edit) and stay fixed for the job's lifetime.
+const JOB_EDITABLE_FIELDS = {
+  pickupTerminal: 'pickup_terminal',
+  deliveryArea: 'delivery_area',
+  deliveryAddress: 'delivery_address',
+  containerNumber: 'container_number',
+  readyAt: 'ready_at',
+  deadline: 'deadline',
+  maxBudgetAed: 'max_budget_aed',
+  requiresReefer: 'requires_reefer',
+  requiresHazmat: 'requires_hazmat',
+  freeTimeDays: 'free_time_days',
+  demurrageRateAed: 'demurrage_rate_aed',
+  notes: 'notes',
+  containerCount: 'container_count',
+  truckCount: 'truck_count',
+  pickupLat: 'pickup_lat',
+  pickupLng: 'pickup_lng',
+  pickupAddressDetail: 'pickup_address_detail',
+  deliveryLat: 'delivery_lat',
+  deliveryLng: 'delivery_lng',
+  deliveryAddressDetail: 'delivery_address_detail',
+};
+const BOOLEAN_JOB_FIELDS = new Set(['requiresReefer', 'requiresHazmat']);
+const COUNT_JOB_FIELDS = new Set(['containerCount', 'truckCount']);
+
+app.patch('/api/jobs/:id', auth(['SHIPPER']), requireSeatRole(['OPS']), (req, res) => {
+  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
+  if (!job) return sendError(res, 404, 'Job not found');
+  if (job.shipper_id !== req.user.id) return sendError(res, 403, 'Not your job');
+  if (job.status !== 'OPEN') return sendError(res, 403, 'A job can only be edited while OPEN');
+  const hasPendingBid = db.prepare(`SELECT 1 FROM bids WHERE job_id=? AND status='PENDING'`).get(job.id);
+  if (hasPendingBid) return sendError(res, 403, 'Cannot edit a job that already has a pending bid — withdraw/reject bids first, or cancel and repost');
+
+  const b = req.body || {};
+  if ((b.pickupLat !== undefined || b.pickupLng !== undefined) && !isValidUaeLatLng(Number(b.pickupLat), Number(b.pickupLng))) {
+    return sendError(res, 400, 'pickupLat/pickupLng must be valid UAE coordinates');
+  }
+  if ((b.deliveryLat !== undefined || b.deliveryLng !== undefined) && !isValidUaeLatLng(Number(b.deliveryLat), Number(b.deliveryLng))) {
+    return sendError(res, 400, 'deliveryLat/deliveryLng must be valid UAE coordinates');
+  }
+  const sets = [];
+  const params = [];
+  const beforeState = {};
+  for (const [key, column] of Object.entries(JOB_EDITABLE_FIELDS)) {
+    if (b[key] === undefined) continue;
+    let value = b[key];
+    if (BOOLEAN_JOB_FIELDS.has(key)) value = value ? 1 : 0;
+    if (COUNT_JOB_FIELDS.has(key)) value = Math.max(1, Number(value) || 1);
+    beforeState[column] = job[column];
+    sets.push(`${column}=?`);
+    params.push(value);
+  }
+  if (!sets.length) return sendError(res, 400, 'No editable fields supplied');
+
+  sets.push(`updated_at=datetime('now')`);
+  params.push(job.id);
+  db.prepare(`UPDATE jobs SET ${sets.join(', ')} WHERE id=?`).run(...params);
+  writeAudit(req, {
+    userId: req.actorId,
+    action: 'JOB_EDIT',
+    details: `${job.job_code} edited: ${Object.keys(beforeState).join(', ')}`,
+    entityType: 'job',
+    entityId: job.id,
+    beforeState: JSON.stringify(beforeState),
+    afterState: JSON.stringify(Object.fromEntries(Object.entries(JOB_EDITABLE_FIELDS).filter(([k]) => b[k] !== undefined).map(([k, col]) => [col, b[k]]))),
+  });
+  const updated = db.prepare('SELECT * FROM jobs WHERE id=?').get(job.id);
+  res.json({ job: updated });
 });
 
 app.get('/api/jobs/:id', auth(), (req, res) => {
@@ -893,18 +1185,29 @@ app.get('/api/jobs/:id', auth(), (req, res) => {
   if (!job) return sendError(res, 404, 'Job not found');
   if (!canViewJob(job, req.user)) return sendError(res, 403, 'Not permitted to view this job');
 
-  let bids = db.prepare('SELECT * FROM bids WHERE job_id=? ORDER BY amount_aed ASC').all(job.id);
+  let bids = db
+    .prepare(
+      `SELECT bids.*, cp.rating_avg as carrier_rating, cp.company_name as carrier_company
+       FROM bids LEFT JOIN profiles cp ON cp.user_id = bids.carrier_id
+       WHERE job_id=? ORDER BY amount_aed ASC`
+    )
+    .all(job.id);
   const isOwnerShipper = req.user.id === job.shipper_id;
   const isAdmin = req.user.role === 'ADMIN';
   if (job.status === 'OPEN' && !isOwnerShipper && !isAdmin) {
     bids = bids.map((b) =>
-      b.carrier_id === req.user.id ? b : { ...b, amount_aed: null, eta_minutes: null, driver_name: null, notes: null, masked: true }
+      b.carrier_id === req.user.id
+        ? b
+        : { ...b, amount_aed: null, eta_minutes: null, driver_name: null, notes: null, carrier_company: null, masked: true }
     );
   }
 
+  const shipperProfile = db.prepare('SELECT rating_avg FROM profiles WHERE user_id=?').get(job.shipper_id);
+  const jobWithRating = { ...job, shipper_rating: shipperProfile ? shipperProfile.rating_avg : null };
+
   const documents = isParticipantOrBidder(job, req.user) ? db.prepare('SELECT * FROM job_documents WHERE job_id=? ORDER BY created_at').all(job.id) : [];
   const payout = db.prepare('SELECT * FROM payouts WHERE job_id=?').get(job.id) || null;
-  res.json({ job, bids, documents, payout });
+  res.json({ job: jobWithRating, bids, documents, payout });
 });
 
 app.post('/api/jobs/:id/bids', auth(['CARRIER']), writeLimiter, requireSeatRole(['OPS']), (req, res) => {
@@ -943,7 +1246,7 @@ app.post('/api/jobs/:id/bids', auth(['CARRIER']), writeLimiter, requireSeatRole(
   }
   const bidId = Number(result.lastInsertRowid);
   writeAudit(req, { userId: req.actorId, action: 'BID_CREATE', details: `Bid AED ${amount} on ${job.job_code}`, entityType: 'bid', entityId: bidId });
-  notify(job.shipper_id, 'New bid received', `${req.user.profile.company_name} bid AED ${amount} on ${job.job_code}.`, job.id);
+  notify(job.shipper_id, 'New bid received', `${req.user.profile.company_name} bid AED ${amount} on ${job.job_code}.`, job.id, 'bid');
   const bid = db.prepare('SELECT * FROM bids WHERE id=?').get(bidId);
   res.status(201).json({ bid });
 });
@@ -1020,9 +1323,9 @@ app.post('/api/jobs/:id/award', auth(['SHIPPER']), requireSeatRole(['OPS']), (re
       beforeState: 'OPEN',
       afterState: 'AWARDED',
     });
-    notify(bid.carrier_id, 'Bid accepted', `Your bid on ${freshJob.job_code} was accepted. Escrow is HELD.`, jobId);
+    notify(bid.carrier_id, 'Bid accepted', `Your bid on ${freshJob.job_code} was accepted. Escrow is HELD.`, jobId, 'award');
     const rejected = db.prepare('SELECT carrier_id FROM bids WHERE job_id=? AND id!=?').all(jobId, bid.id);
-    for (const r of rejected) notify(r.carrier_id, 'Bid not selected', `Another carrier was awarded ${freshJob.job_code}.`, jobId);
+    for (const r of rejected) notify(r.carrier_id, 'Bid not selected', `Another carrier was awarded ${freshJob.job_code}.`, jobId, 'award');
     void payoutResult;
     db.exec('COMMIT');
     const job2 = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
@@ -1089,7 +1392,7 @@ app.patch('/api/jobs/:id/status', auth(), requireSeatRole(['OPS']), (req, res) =
     db.prepare(`UPDATE jobs SET escrow_status='RELEASED', payout_released_at=datetime('now') WHERE id=?`).run(job.id);
     db.prepare(`UPDATE payouts SET status='RELEASED', release_type='MANUAL', released_at=datetime('now'), sla_deadline=datetime('now', '+48 hours') WHERE job_id=?`).run(job.id);
     issueInvoice(db, job.id);
-    notify(job.carrier_id, 'Funds on the way', `${job.job_code} was confirmed delivered. Payout released.`, job.id);
+    notify(job.carrier_id, 'Funds on the way', `${job.job_code} was confirmed delivered. Payout released.`, job.id, 'payout');
   }
 
   writeAudit(req, {
@@ -1102,7 +1405,7 @@ app.patch('/api/jobs/:id/status', auth(), requireSeatRole(['OPS']), (req, res) =
     afterState: next,
   });
   const other = req.user.id === job.shipper_id ? job.carrier_id : job.shipper_id;
-  notify(other, 'Job status updated', `${job.job_code} is now ${next}.`, job.id);
+  notify(other, 'Job status updated', `${job.job_code} is now ${next}.`, job.id, 'status');
 
   const updated = db.prepare('SELECT * FROM jobs WHERE id=?').get(job.id);
   res.json({ job: updated });
@@ -1139,7 +1442,7 @@ app.patch('/api/jobs/:id/driver', auth(['CARRIER']), requireSeatRole(['OPS']), (
     beforeState: job.assigned_driver_phone || 'unset',
     afterState: normalizedPhone,
   });
-  notify(job.shipper_id, 'Driver reassigned', `${job.job_code}: the assigned driver was changed to ${driverName}.`, job.id);
+  notify(job.shipper_id, 'Driver reassigned', `${job.job_code}: the assigned driver was changed to ${driverName}.`, job.id, 'status');
   const updated = db.prepare('SELECT * FROM jobs WHERE id=?').get(job.id);
   res.json({ job: updated });
 });
@@ -1150,15 +1453,28 @@ app.post('/api/jobs/:id/pod', auth(['CARRIER']), requireSeatRole(['OPS']), (req,
   if (job.carrier_id !== req.user.id) return sendError(res, 403, 'Not your job');
   if (job.status !== 'IN_TRANSIT') return sendError(res, 403, 'Job must be IN_TRANSIT to submit proof of delivery');
 
-  db.prepare(`UPDATE jobs SET status='DELIVERED', delivered_at=datetime('now'), updated_at=datetime('now') WHERE id=?`).run(job.id);
   const doc = (req.body || {}).document;
-  if (doc) {
-    db.prepare('INSERT INTO job_documents (job_id, uploader_id, doc_type, title, file_url) VALUES (?,?,?,?,?)').run(
+  // Validate/save any uploaded file *before* mutating job status, so a bad
+  // upload 400s cleanly instead of leaving the job DELIVERED with no POD.
+  let storagePath = null;
+  let mimeType = null;
+  if (doc && doc.fileBase64) {
+    try {
+      ({ storagePath, mimeType } = saveUploadedFile(job.id, doc.mimeType, doc.fileBase64));
+    } catch (e) {
+      return sendError(res, e.status || 400, e.message || 'Upload failed');
+    }
+  }
+  db.prepare(`UPDATE jobs SET status='DELIVERED', delivered_at=datetime('now'), updated_at=datetime('now') WHERE id=?`).run(job.id);
+  if (doc && (doc.fileUrl || storagePath)) {
+    db.prepare('INSERT INTO job_documents (job_id, uploader_id, doc_type, title, file_url, storage_path, mime_type) VALUES (?,?,?,?,?,?,?)').run(
       job.id,
       req.actorId,
       DOC_TYPES.includes(doc.docType) ? doc.docType : 'POD',
       doc.title || 'Proof of Delivery',
-      doc.fileUrl || ''
+      doc.fileUrl || storagePath || '',
+      storagePath,
+      mimeType
     );
   }
   writeAudit(req, {
@@ -1171,9 +1487,45 @@ app.post('/api/jobs/:id/pod', auth(['CARRIER']), requireSeatRole(['OPS']), (req,
     afterState: 'DELIVERED',
   });
   const { auto_release_hours } = getSettings();
-  notify(job.shipper_id, 'Proof of delivery submitted', `Confirm delivery on ${job.job_code}, or it auto-releases in ${auto_release_hours}h.`, job.id);
+  notify(job.shipper_id, 'Proof of delivery submitted', `Confirm delivery on ${job.job_code}, or it auto-releases in ${auto_release_hours}h.`, job.id, 'status');
   const updated = db.prepare('SELECT * FROM jobs WHERE id=?').get(job.id);
   res.json({ job: updated });
+});
+
+// Self-serve dispute filing — previously a shipper or carrier with an
+// actual problem had no in-app way to raise it; only an admin could open a
+// dispute (POST /api/admin/disputes below), which meant reaching one was
+// entirely outside the product (WhatsApp/support). Only the job's own
+// shipper or carrier can file, only on a job where there's actually
+// something to dispute (awarded through completed — not OPEN, which has no
+// counterparty commitment yet, and not already CANCELLED/DISPUTED).
+const DISPUTABLE_STATUSES = ['AWARDED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
+app.post('/api/jobs/:id/dispute', auth(['SHIPPER', 'CARRIER']), requireSeatRole(['OPS']), (req, res) => {
+  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
+  if (!job) return sendError(res, 404, 'Job not found');
+  const isShipperOwner = req.user.role === 'SHIPPER' && job.shipper_id === req.user.id;
+  const isCarrierOwner = req.user.role === 'CARRIER' && job.carrier_id === req.user.id;
+  if (!isShipperOwner && !isCarrierOwner) return sendError(res, 403, 'Not a participant on this job');
+  if (!DISPUTABLE_STATUSES.includes(job.status)) return sendError(res, 403, `Cannot dispute a job in ${job.status} status`);
+  const { reason } = req.body || {};
+  if (!reason || !reason.trim()) return sendError(res, 400, 'reason is required');
+
+  const result = db.prepare('INSERT INTO disputes (job_id, opened_by, reason, status) VALUES (?,?,?,\'OPEN\')').run(job.id, req.user.id, reason.trim());
+  db.prepare(`UPDATE jobs SET status='DISPUTED', escrow_status='DISPUTED', updated_at=datetime('now') WHERE id=?`).run(job.id);
+  writeAudit(req, {
+    userId: req.actorId,
+    action: 'DISPUTE_OPEN',
+    details: reason.trim(),
+    entityType: 'job',
+    entityId: job.id,
+    beforeState: job.status,
+    afterState: 'DISPUTED',
+  });
+  const other = req.user.id === job.shipper_id ? job.carrier_id : job.shipper_id;
+  notify(other, 'Dispute opened', `${job.job_code}: a dispute was opened by the counterparty. Escrow is frozen pending admin review.`, job.id, 'dispute');
+  notifyAdmins('New dispute filed', `${job.job_code}: filed by ${req.actorLabel}. Escrow frozen, awaiting review.`, job.id);
+  const dispute = db.prepare('SELECT * FROM disputes WHERE id=?').get(Number(result.lastInsertRowid));
+  res.status(201).json({ dispute });
 });
 
 app.get('/api/jobs/:id/track', auth(), (req, res) => {
@@ -1218,21 +1570,102 @@ app.get('/api/jobs/:id/track', auth(), (req, res) => {
   });
 });
 
+// Backload / reverse-load matching — the "zero deadhead miles" pitch for an
+// owner-driver: while hauling job A, surface OPEN jobs that start roughly
+// where A is dropping off, so the return leg isn't an empty run. Ranked by
+// real distance (haversine on the optional map pins from LocationPicker)
+// when both sides have one; falls back to "same emirate" — real UAE
+// geography (TERMINAL_EMIRATE/AREA_EMIRATE above), not a guess — when a pin
+// is missing, which is the common case since pins are optional.
+const BACKLOAD_ELIGIBLE_STATUSES = ['AWARDED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
+const BACKLOAD_MAX_DISTANCE_KM = 100;
+app.get('/api/jobs/:id/backload-matches', auth(['CARRIER']), (req, res) => {
+  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
+  if (!job) return sendError(res, 404, 'Job not found');
+  if (job.carrier_id !== req.user.id) return sendError(res, 403, 'Not your job');
+  if (!BACKLOAD_ELIGIBLE_STATUSES.includes(job.status)) {
+    return sendError(res, 403, `Backload matching is only available once a job is ${BACKLOAD_ELIGIBLE_STATUSES.join('/')}`);
+  }
+
+  const deliveryEmirate = AREA_EMIRATE[job.delivery_area] || null;
+  const candidates = db
+    .prepare(
+      `SELECT j.*, p.company_name AS shipper_company, p.rating_avg AS shipper_rating
+       FROM jobs j LEFT JOIN profiles p ON p.user_id = j.shipper_id
+       WHERE j.status='OPEN' AND j.id != ?
+       ORDER BY j.created_at DESC LIMIT 200`
+    )
+    .all(job.id);
+
+  const matches = [];
+  for (const c of candidates) {
+    let matchType = null;
+    let distanceKm = null;
+    if (job.delivery_lat != null && job.delivery_lng != null && c.pickup_lat != null && c.pickup_lng != null) {
+      const d = haversineKm(job.delivery_lat, job.delivery_lng, c.pickup_lat, c.pickup_lng);
+      if (d <= BACKLOAD_MAX_DISTANCE_KM) {
+        matchType = 'coords';
+        distanceKm = Math.round(d * 10) / 10;
+      }
+    } else if (deliveryEmirate && TERMINAL_EMIRATE[c.pickup_terminal] === deliveryEmirate) {
+      matchType = 'area';
+    }
+    if (matchType) matches.push({ ...c, matchType, distanceKm });
+  }
+  matches.sort((a, b) => {
+    if (a.matchType === 'coords' && b.matchType === 'coords') return a.distanceKm - b.distanceKm;
+    if (a.matchType === 'coords') return -1;
+    if (b.matchType === 'coords') return 1;
+    return 0;
+  });
+
+  res.json({ matches: matches.slice(0, 10) });
+});
+
 app.post('/api/jobs/:id/documents', auth(), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
   if (!isParticipantOrBidder(job, req.user)) return sendError(res, 403, 'Not permitted');
   const b = req.body || {};
-  if (!b.title || !b.fileUrl) return sendError(res, 400, 'title and fileUrl are required');
-  db.prepare('INSERT INTO job_documents (job_id, uploader_id, doc_type, title, file_url) VALUES (?,?,?,?,?)').run(
+  if (!b.title || !(b.fileUrl || b.fileBase64)) return sendError(res, 400, 'title and (fileUrl or fileBase64+mimeType) are required');
+  let storagePath = null;
+  let mimeType = null;
+  if (b.fileBase64) {
+    try {
+      ({ storagePath, mimeType } = saveUploadedFile(job.id, b.mimeType, b.fileBase64));
+    } catch (e) {
+      return sendError(res, e.status || 400, e.message || 'Upload failed');
+    }
+  }
+  db.prepare('INSERT INTO job_documents (job_id, uploader_id, doc_type, title, file_url, storage_path, mime_type) VALUES (?,?,?,?,?,?,?)').run(
     job.id,
     req.actorId,
     DOC_TYPES.includes(b.docType) ? b.docType : 'OTHER',
     b.title,
-    b.fileUrl
+    b.fileUrl || storagePath || '',
+    storagePath,
+    mimeType
   );
   writeAudit(req, { userId: req.actorId, action: 'DOCUMENT_ADD', details: `${b.docType || 'OTHER'} on ${job.job_code}`, entityType: 'job', entityId: job.id });
   res.status(201).json({ ok: true });
+});
+
+// Access-controlled file serving: reuses the exact isParticipantOrBidder
+// check every other job-scoped route uses, so an uploaded POD/customs doc
+// is only readable by the job's shipper, carrier, or a bidding carrier (or
+// admin) — never a bare guessable URL.
+app.get('/api/jobs/:id/documents/:docId/file', auth(), (req, res) => {
+  const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
+  if (!job) return sendError(res, 404, 'Job not found');
+  if (!isParticipantOrBidder(job, req.user)) return sendError(res, 403, 'Not permitted');
+  const doc = db.prepare('SELECT * FROM job_documents WHERE id=? AND job_id=?').get(req.params.docId, job.id);
+  if (!doc) return sendError(res, 404, 'Document not found');
+  if (!doc.storage_path) return res.redirect(doc.file_url);
+  const filePath = path.join(UPLOADS_DIR, doc.storage_path);
+  if (!filePath.startsWith(UPLOADS_DIR) || !fs.existsSync(filePath)) return sendError(res, 404, 'File not found');
+  res.set('Content-Type', doc.mime_type || 'application/octet-stream');
+  res.set('Content-Disposition', `inline; filename="${doc.title.replace(/[^\w.-]/g, '_')}"`);
+  res.sendFile(filePath);
 });
 
 app.post('/api/jobs/:id/rating', auth(), (req, res) => {
@@ -1284,7 +1717,7 @@ app.post('/api/jobs/:id/messages', auth(), (req, res) => {
   if (!content || !content.trim()) return sendError(res, 400, 'content is required');
   const result = db.prepare('INSERT INTO messages (job_id, sender_id, content) VALUES (?,?,?)').run(job.id, req.actorId, content.trim());
   const other = req.user.id === job.shipper_id ? job.carrier_id : job.shipper_id;
-  notify(other, 'New message', `New message on ${job.job_code}`, job.id);
+  notify(other, 'New message', `New message on ${job.job_code}`, job.id, 'message');
   const message = db.prepare('SELECT * FROM messages WHERE id=?').get(Number(result.lastInsertRowid));
   res.status(201).json({ message });
 });
@@ -1411,6 +1844,17 @@ app.get('/api/invoices', auth(['CARRIER', 'ADMIN']), (req, res) => {
   res.json({ invoices });
 });
 
+// Registered *before* the /:id route below — otherwise Express would match
+// "print.js" as an :id first and 404 it there.
+// Served same-origin so the invoice page's Print button works under the
+// strict `script-src 'self'` CSP (securityHeaders in lib/http.js) — an
+// inline onclick/<script> would be silently blocked by the browser.
+app.get('/api/invoices/print.js', (req, res) => {
+  res.set('Content-Type', 'application/javascript').set('Cache-Control', 'public, max-age=31536000, immutable').send(
+    `document.getElementById('invoice-print-btn')?.addEventListener('click', () => window.print());`
+  );
+});
+
 app.get('/api/invoices/:id', auth(['CARRIER', 'ADMIN']), (req, res) => {
   const invoice = db.prepare('SELECT * FROM invoices WHERE id=?').get(req.params.id);
   if (!invoice) return sendError(res, 404, 'Invoice not found');
@@ -1429,6 +1873,22 @@ app.get('/api/notifications', auth(), (req, res) => {
 app.post('/api/notifications/read', auth(), (req, res) => {
   db.prepare('UPDATE notifications SET is_read=1 WHERE user_id=?').run(req.user.id);
   res.json({ ok: true });
+});
+
+app.get('/api/notifications/preferences', auth(), (req, res) => {
+  const row = db.prepare('SELECT notification_prefs_disabled FROM users WHERE id=?').get(req.user.id);
+  const disabled = row ? row.notification_prefs_disabled.split(',').filter(Boolean) : [];
+  res.json({ types: NOTIFICATION_TYPES, disabled });
+});
+
+app.patch('/api/notifications/preferences', auth(), (req, res) => {
+  const { disabled } = req.body;
+  if (!Array.isArray(disabled) || !disabled.every((t) => NOTIFICATION_TYPES.includes(t))) {
+    return sendError(res, 400, `disabled must be an array of: ${NOTIFICATION_TYPES.join(', ')}`);
+  }
+  const csv = [...new Set(disabled)].join(',');
+  db.prepare('UPDATE users SET notification_prefs_disabled=? WHERE id=?').run(csv, req.user.id);
+  res.json({ types: NOTIFICATION_TYPES, disabled: [...new Set(disabled)] });
 });
 
 // =============================================================================
@@ -1484,25 +1944,60 @@ app.get('/api/admin/verification', auth(['ADMIN']), (req, res) => {
   });
 });
 
-app.post('/api/admin/verify/:id', auth(['ADMIN']), (req, res) => {
-  const carrier = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
-  if (!carrier) return sendError(res, 404, 'Carrier not found');
-  const { action, iban } = req.body || {};
-  if (!['approve', 'reject'].includes(action)) return sendError(res, 400, 'action must be approve or reject');
+// Shared by the single-carrier route and the bulk route below. Throws
+// { status, message } on failure (bulk catches per-row; single re-throws
+// as a normal sendError) rather than writing to res directly.
+function verifyCarrier(req, carrierId, action, iban) {
+  const carrier = db.prepare('SELECT * FROM users WHERE id=?').get(carrierId);
+  if (!carrier) throw { status: 404, message: 'Carrier not found' };
+  if (!['approve', 'reject'].includes(action)) throw { status: 400, message: 'action must be approve or reject' };
 
   if (action === 'approve') {
     const existingIban = db.prepare('SELECT iban FROM profiles WHERE user_id=?').get(carrier.id).iban;
-    if (!iban && !existingIban) return sendError(res, 400, 'IBAN is required to approve verification');
+    if (!iban && !existingIban) throw { status: 400, message: 'IBAN is required to approve verification' };
     db.prepare('UPDATE users SET is_verified=1 WHERE id=?').run(carrier.id);
     db.prepare(`UPDATE profiles SET verified_at=datetime('now'), iban=COALESCE(?, iban) WHERE user_id=?`).run(iban ? encryptField(iban) : null, carrier.id);
     writeAudit(req, { userId: req.actorId, action: 'VERIFY', details: `Approved carrier #${carrier.id}`, entityType: 'user', entityId: carrier.id, afterState: 'VERIFIED' });
-    notify(carrier.id, 'Verification approved', 'You can now bid on open loads.');
+    notify(carrier.id, 'Verification approved', 'You can now bid on open loads.', null, 'verification');
   } else {
     writeAudit(req, { userId: req.actorId, action: 'VERIFY', details: `Rejected carrier #${carrier.id}`, entityType: 'user', entityId: carrier.id, afterState: 'REJECTED' });
-    notify(carrier.id, 'Verification rejected', 'Your verification could not be approved. Contact support.');
+    notify(carrier.id, 'Verification rejected', 'Your verification could not be approved. Contact support.', null, 'verification');
   }
-  const user = db.prepare('SELECT * FROM users WHERE id=?').get(carrier.id);
-  res.json({ ok: true, user: toPublicUser(user) });
+  return toPublicUser(db.prepare('SELECT * FROM users WHERE id=?').get(carrier.id));
+}
+
+app.post('/api/admin/verify/:id', auth(['ADMIN']), (req, res) => {
+  const { action, iban } = req.body || {};
+  try {
+    const user = verifyCarrier(req, req.params.id, action, iban);
+    res.json({ ok: true, user });
+  } catch (e) {
+    if (e.status) return sendError(res, e.status, e.message);
+    throw e;
+  }
+});
+
+// Bulk verification — repetitive one-at-a-time approve/reject clicks were
+// the main admin toil here. Each carrier is processed independently (no
+// per-carrier IBAN input in bulk — approval only succeeds for carriers who
+// already have one on file from registration) so one failure doesn't block
+// the rest of the batch; the response reports per-carrier outcome.
+const ADMIN_VERIFY_BULK_MAX = 100;
+app.post('/api/admin/verify-bulk', auth(['ADMIN']), (req, res) => {
+  const { ids, action } = req.body || {};
+  if (!Array.isArray(ids) || ids.length === 0) return sendError(res, 400, 'ids must be a non-empty array');
+  if (ids.length > ADMIN_VERIFY_BULK_MAX) return sendError(res, 400, `Cannot bulk-verify more than ${ADMIN_VERIFY_BULK_MAX} at once`);
+  if (!['approve', 'reject'].includes(action)) return sendError(res, 400, 'action must be approve or reject');
+
+  const results = ids.map((id) => {
+    try {
+      verifyCarrier(req, id, action, undefined);
+      return { id, ok: true };
+    } catch (e) {
+      return { id, ok: false, error: e.message || 'Unknown error' };
+    }
+  });
+  res.json({ results, succeeded: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length });
 });
 
 app.get('/api/admin/users', auth(['ADMIN']), (req, res) => {
@@ -1627,8 +2122,8 @@ app.post('/api/admin/disputes', auth(['ADMIN']), (req, res) => {
   const result = db.prepare('INSERT INTO disputes (job_id, opened_by, reason, status) VALUES (?,?,?,\'OPEN\')').run(job.id, req.user.id, reason);
   db.prepare(`UPDATE jobs SET status='DISPUTED', escrow_status='DISPUTED', updated_at=datetime('now') WHERE id=?`).run(job.id);
   writeAudit(req, { userId: req.actorId, action: 'DISPUTE_OPEN', details: reason, entityType: 'job', entityId: job.id, beforeState: job.status, afterState: 'DISPUTED' });
-  notify(job.shipper_id, 'Dispute opened', `A dispute was opened on ${job.job_code}. Escrow is frozen.`, job.id);
-  notify(job.carrier_id, 'Dispute opened', `A dispute was opened on ${job.job_code}. Escrow is frozen.`, job.id);
+  notify(job.shipper_id, 'Dispute opened', `A dispute was opened on ${job.job_code}. Escrow is frozen.`, job.id, 'dispute');
+  notify(job.carrier_id, 'Dispute opened', `A dispute was opened on ${job.job_code}. Escrow is frozen.`, job.id, 'dispute');
   const dispute = db.prepare('SELECT * FROM disputes WHERE id=?').get(Number(result.lastInsertRowid));
   res.status(201).json({ dispute });
 });
@@ -1655,8 +2150,8 @@ app.post('/api/admin/disputes/:id/resolve', auth(['ADMIN']), (req, res) => {
     dispute.id
   );
   writeAudit(req, { userId: req.actorId, action: 'DISPUTE_RESOLVE', details: `${decision}: ${determination || ''}`, entityType: 'dispute', entityId: dispute.id, beforeState: 'OPEN', afterState: 'RESOLVED' });
-  notify(job.shipper_id, 'Dispute resolved', `${job.job_code}: ${decision.replaceAll('_', ' ')}.`, job.id);
-  notify(job.carrier_id, 'Dispute resolved', `${job.job_code}: ${decision.replaceAll('_', ' ')}.`, job.id);
+  notify(job.shipper_id, 'Dispute resolved', `${job.job_code}: ${decision.replaceAll('_', ' ')}.`, job.id, 'dispute');
+  notify(job.carrier_id, 'Dispute resolved', `${job.job_code}: ${decision.replaceAll('_', ' ')}.`, job.id, 'dispute');
   res.json({ ok: true });
 });
 
