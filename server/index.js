@@ -1563,7 +1563,8 @@ function renderSeoPage(res, meta) {
   // back to the untouched empty div — same behavior as before this existed
   // — if prerendering never ran for this route. This is prerendering for
   // crawlers, not hydration: main.jsx still boots with plain createRoot(),
-  // which replaces this markup the moment client JS mounts.
+  // which replaces this markup the moment client JS mounts (Landing.jsx has
+  // its own guard against the resulting entrance-animation replay).
   const prerendered = meta.slug ? loadPrerendered(meta.slug) : null;
   if (prerendered) {
     html = html.replace('<div id="root"></div>', `<div id="root">${prerendered}</div>`);

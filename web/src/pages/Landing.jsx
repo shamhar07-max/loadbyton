@@ -13,12 +13,31 @@ const EQUIPMENT_ICONS = {
   PICKUP_10T: IconTruck, SIDE_LOADER_TRAILER: IconLayers, TRIPPER: IconLayers,
 };
 
+// Module scope, evaluated once when this chunk first loads — before React
+// mounts anything. True only when server/index.js spliced build-time-
+// prerendered static markup into #root (see entry-server.jsx): that markup
+// already plays the hero's CSS entrance animation once, via CSS alone,
+// before any JS has run. main.jsx's createRoot() then discards and
+// recreates this whole tree, and without this guard the freshly created
+// elements would replay the same animation a second time — a visible
+// double-fade "pop" on every cold load of "/". Consumed at most once, by
+// whichever Landing instance mounts first; a later mount from client-side
+// navigation back to "/" animates normally.
+let skipHeroAnimOnce = typeof document !== 'undefined' && !!document.getElementById('root')?.hasChildNodes();
+
 export default function Landing() {
   usePageTitle('');
   const { t } = useLocale();
   const [lanes, setLanes] = useState([]);
   const [carriers, setCarriers] = useState([]);
   const [market, setMarket] = useState(null);
+  const [heroAnim] = useState(() => {
+    if (skipHeroAnimOnce) {
+      skipHeroAnimOnce = false;
+      return '';
+    }
+    return 'animate-hero-in';
+  });
 
   useEffect(() => {
     api.publicLanes().then((d) => setLanes(d.lanes.slice(0, 5))).catch(() => {});
@@ -32,13 +51,13 @@ export default function Landing() {
       <section className="border-b" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page grid gap-12 py-16 lg:grid-cols-[1.05fr,0.95fr] lg:py-24">
           <div className="flex flex-col justify-center">
-            <h1 className="animate-hero-in font-display text-4xl font-semibold leading-[1.08] tracking-tight text-ink md:text-5xl">
+            <h1 className={`${heroAnim} font-display text-4xl font-semibold leading-[1.08] tracking-tight text-ink md:text-5xl`}>
               {t('landing.hero.title')}
             </h1>
-            <p className="animate-hero-in mt-5 max-w-lg text-base leading-relaxed text-ink-secondary md:text-lg" style={{ animationDelay: '90ms' }}>
+            <p className={`${heroAnim} mt-5 max-w-lg text-base leading-relaxed text-ink-secondary md:text-lg`} style={{ animationDelay: '90ms' }}>
               {t('landing.hero.subtitle')}
             </p>
-            <div className="animate-hero-in mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: '160ms' }}>
+            <div className={`${heroAnim} mt-8 flex flex-wrap items-center gap-3`} style={{ animationDelay: '160ms' }}>
               <Link to="/register" className="btn-accent rounded-full px-6 py-3 text-base">
                 {t('landing.hero.ctaShipper')} <IconArrowRight size={18} />
               </Link>
@@ -46,14 +65,14 @@ export default function Landing() {
                 {t('landing.hero.ctaCarrier')}
               </Link>
             </div>
-            <div className="animate-hero-in mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-ink-muted" style={{ animationDelay: '230ms' }}>
+            <div className={`${heroAnim} mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-ink-muted`} style={{ animationDelay: '230ms' }}>
               <span className="inline-flex items-center gap-1.5"><IconShield size={16} /> {t('landing.hero.verified')}</span>
               <span className="inline-flex items-center gap-1.5"><IconClock size={16} /> {t('landing.hero.autoRelease', 'Auto-released in {hours}h', { hours: 24 })}</span>
               <span className="inline-flex items-center gap-1.5"><IconCompass size={16} /> {t('landing.hero.coverage')}</span>
             </div>
           </div>
 
-          <div className="animate-hero-in flex items-center" style={{ animationDelay: '120ms' }}>
+          <div className={`${heroAnim} flex items-center`} style={{ animationDelay: '120ms' }}>
             <div className="w-full overflow-hidden rounded-xl border shadow-lg transition-shadow duration-500 hover:shadow-xl" style={{ borderColor: 'var(--border-default)', background: 'var(--lb-ink-900)' }}>
               <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
                 <p className="font-display text-sm font-semibold text-white">Lane Index — live</p>
@@ -97,12 +116,13 @@ export default function Landing() {
       <section className="border-b py-16" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page">
           <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Four steps, one escrow.</Reveal>
+          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Every shipment moves through the same sequence, regardless of equipment type or emirate — one workflow to learn, not one per carrier relationship.</Reveal>
           <div className="mt-10 grid gap-8 md:grid-cols-4">
             {[
-              { n: '01', title: 'Post the job', body: 'Equipment type, pickup terminal, delivery address, deadline, budget — plus volume for more than one load.', icon: <IconPackage size={20} /> },
-              { n: '02', title: 'Carriers bid', body: 'Verified carriers only. Price and ETA, benchmarked against the Lane Index.', icon: <IconTruck size={20} /> },
-              { n: '03', title: 'Award & escrow', body: 'One transaction: bid accepted, price held, payout row created.', icon: <IconShield size={20} /> },
-              { n: '04', title: 'Deliver & release', body: 'POD uploaded, you confirm — or it auto-releases in 24h either way.', icon: <IconClock size={20} /> },
+              { n: '01', title: 'Post the job', body: 'Specify equipment type, pickup terminal, delivery address, deadline, and budget. For more than one unit, post the count once as a volume inquiry.', icon: <IconPackage size={20} /> },
+              { n: '02', title: 'Carriers bid', body: 'Only carriers verified on trade licence, insurance, and TRN can bid. Each price and ETA is benchmarked against the live Lane Index.', icon: <IconTruck size={20} /> },
+              { n: '03', title: 'Award & escrow', body: 'Accepting a bid locks the price and creates a single payout record — the shipment and its funds move together from that point on.', icon: <IconShield size={20} /> },
+              { n: '04', title: 'Deliver & release', body: 'The carrier uploads proof of delivery for your confirmation. If no action is taken, escrow releases automatically after 24 hours.', icon: <IconClock size={20} /> },
             ].map((step, i) => (
               <Reveal key={step.n} delay={i * 70}>
                 <div className="flex h-10 w-10 items-center justify-center rounded-md" style={{ background: 'var(--bg-raised)', color: 'var(--brand-accent)' }}>
@@ -120,8 +140,8 @@ export default function Landing() {
       {/* Equipment coverage — not just containers. */}
       <section className="border-b py-16" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page">
-          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Whatever's moving, not just containers.</Reveal>
-          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Post the equipment the job actually needs — a chassis for a 40ft box, a tripper for a construction haul, a 3-tonne pickup for a small run.</Reveal>
+          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Equipment coverage beyond containers.</Reveal>
+          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Twelve equipment classes are supported today — container chassis and reefer trucks, flatbed and curtain-side trailers, tripper and side-loader configurations, and pickups from three to ten tonnes. Select what the job requires; carrier matching and pricing adjust accordingly.</Reveal>
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {EQUIPMENT_TYPES.map((t, i) => {
               const EqIcon = EQUIPMENT_ICONS[t] || IconTruck;
@@ -141,8 +161,8 @@ export default function Landing() {
       {/* UAE coverage — explicitly not Jebel-Ali-only. */}
       <section className="border-b py-16" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page">
-          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Live across the UAE, not just Dubai.</Reveal>
-          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Six terminals, four emirates, one Lane Index — the same escrow and bidding mechanics wherever the job starts.</Reveal>
+          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Coverage across four emirates.</Reveal>
+          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Loadbyton operates from six terminals spanning Dubai, Abu Dhabi, Sharjah, and Fujairah. Escrow, bidding, and the Lane Index work identically at every terminal — pricing and carrier availability are simply local to where the job originates.</Reveal>
           <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {TERMINALS.map((t, i) => (
               <Reveal key={t} delay={(i % 3) * 60} className="card flex items-start gap-3 p-4">
@@ -164,8 +184,8 @@ export default function Landing() {
         <div className="container-page">
           <Reveal className="flex flex-col items-start justify-between gap-6 rounded-xl border px-8 py-10 sm:flex-row sm:items-center" style={{ borderColor: 'var(--border-default)' }}>
             <div>
-              <p className="font-display text-xl font-semibold text-ink">Moving 10 containers, or need 5 trucks for one job?</p>
-              <p className="mt-1 max-w-lg text-sm text-ink-muted">Post it as a single volume inquiry — state the container count or truck count once, and a carrier bids to cover the whole batch.</p>
+              <p className="font-display text-xl font-semibold text-ink">Multi-unit and multi-truck jobs, posted once.</p>
+              <p className="mt-1 max-w-lg text-sm text-ink-muted">State the container count or truck count when posting — carriers bid to cover the full batch under a single agreed price, rather than negotiating unit by unit.</p>
             </div>
             <Link to="/register" className="btn-secondary shrink-0 rounded-full px-6 py-3 text-base">
               Post a volume inquiry <IconArrowRight size={18} />
@@ -179,8 +199,8 @@ export default function Landing() {
         <div className="container-page">
           <div className="flex items-end justify-between">
             <div>
-              <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Verified carriers, not a phone number in a group chat.</Reveal>
-              <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Every carrier here cleared TRN, trade licence, and insurance review before their first bid.</Reveal>
+              <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">A verified carrier network.</Reveal>
+              <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Every carrier is reviewed against trade licence, TRN, and insurance documentation before their first bid is accepted. Ratings and completed-job counts are drawn from delivery history on the platform, not self-reported.</Reveal>
             </div>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -205,8 +225,8 @@ export default function Landing() {
         <div className="container-page">
           <Reveal className="flex flex-col items-start justify-between gap-6 rounded-xl px-8 py-10 sm:flex-row sm:items-center" style={{ background: 'var(--lb-ink-900)' }}>
             <div>
-              <p className="font-display text-xl font-semibold text-white">Your next shipment shouldn't be a re-negotiation.</p>
-              <p className="mt-1 text-sm text-white/60">Save the lane once. Re-run it in two taps next time.</p>
+              <p className="font-display text-xl font-semibold text-white">Recurring lanes, without recurring negotiation.</p>
+              <p className="mt-1 text-sm text-white/60">Save a lane's equipment, route, and terms once. Re-posting it for the next shipment takes two steps, not a new round of quotes.</p>
             </div>
             <Link to="/register" className="btn-accent rounded-full px-6 py-3 text-base">
               Get started free <IconArrowRight size={18} />
