@@ -37,6 +37,9 @@ export const api = {
   mfaSetup: () => post('/auth/mfa/setup'),
   mfaDisable: () => post('/auth/mfa/disable'),
   updateProfile: (body) => patch('/profile', body),
+  orgMembers: () => get('/org/members'),
+  addOrgMember: (body) => post('/org/members', body),
+  updateOrgMember: (id, body) => patch(`/org/members/${id}`, body),
 
   // public
   publicLanes: () => get('/public/lanes'),

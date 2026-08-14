@@ -165,14 +165,15 @@ function canViewJob(job, user) {
 // Auth: sessions, not JWTs. lb_session HttpOnly cookie -> sessions table.
 // ---------------------------------------------------------------------------
 
-function createSession(req, res, userId, { impersonatingAdminId = null, maxAgeSeconds = 7 * 24 * 60 * 60 } = {}) {
+function createSession(req, res, userId, { impersonatingAdminId = null, actingSeatId = null, maxAgeSeconds = 7 * 24 * 60 * 60 } = {}) {
   const token = randomToken(32);
   const expiresAt = new Date(Date.now() + maxAgeSeconds * 1000).toISOString();
-  db.prepare('INSERT INTO sessions (session_token, user_id, expires_at, impersonating_admin_id) VALUES (?,?,?,?)').run(
+  db.prepare('INSERT INTO sessions (session_token, user_id, expires_at, impersonating_admin_id, acting_seat_id) VALUES (?,?,?,?,?)').run(
     token,
     userId,
     expiresAt,
-    impersonatingAdminId
+    impersonatingAdminId,
+    actingSeatId
   );
   const secure = req.protocol === 'https' ? '; Secure' : '';
   res.setHeader('Set-Cookie', `lb_session=${token}; HttpOnly; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`);
@@ -182,6 +183,15 @@ function clearSessionCookie(res) {
   res.setHeader('Set-Cookie', 'lb_session=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
 }
 
+// Multi-seat accounts: a seat authenticates with their own email/password,
+// but the resulting session keys off the ORG ROOT's id (session.user_id) —
+// req.user below is always the root. That's deliberate: every existing
+// shipper_id/carrier_id ownership check, verification check, and profile
+// read elsewhere in this file keeps working unmodified for a seat, because
+// as far as the data model is concerned a seat *is* the org for the
+// duration of the request. req.actorId / req.seatRole / req.actorLabel
+// carry who's actually driving, for audit attribution and permission
+// gating only (see requireSeatRole below) — never for data ownership.
 function auth(roles) {
   return (req, res, next) => {
     const token = req.cookies.lb_session;
@@ -193,8 +203,32 @@ function auth(roles) {
     const profile = db.prepare('SELECT * FROM profiles WHERE user_id=?').get(user.id);
     req.user = { ...user, profile };
     req.session = session;
+
+    req.actorId = user.id;
+    req.seatRole = null;
+    req.actorLabel = user.email;
+    if (session.acting_seat_id) {
+      const seat = db.prepare('SELECT * FROM users WHERE id=?').get(session.acting_seat_id);
+      if (!seat || !seat.is_active) return sendError(res, 401, 'This seat has been deactivated');
+      req.actorId = seat.id;
+      req.seatRole = seat.seat_role;
+      req.actorLabel = seat.display_name || seat.email;
+    }
+
     if (roles && roles.length && !roles.includes(user.role)) return sendError(res, 403, 'Not permitted for this role');
     next();
+  };
+}
+
+// Gates a mutating action to org roots (req.seatRole === null) and seats
+// whose seat_role is in the allow-list. A VIEWER or FINANCE seat hitting
+// "post a job" or "place a bid" must get the same 403 a wrong role would —
+// this is the enforcement point for that, applied per-route below.
+function requireSeatRole(allowed) {
+  return (req, res, next) => {
+    if (req.seatRole === null) return next(); // org root — full access
+    if (allowed.includes(req.seatRole)) return next();
+    return sendError(res, 403, `Your seat role (${req.seatRole}) cannot perform this action`);
   };
 }
 
@@ -340,6 +374,10 @@ app.post(
       recordFailure(email);
       return sendError(res, 403, 'Invalid email or password');
     }
+    if (!user.is_active) {
+      recordFailure(email);
+      return sendError(res, 403, 'This account has been deactivated');
+    }
     if (user.mfa_enabled) {
       if (!totp.verifyCode(user.mfa_secret, totpCode)) {
         recordFailure(email);
@@ -347,9 +385,19 @@ app.post(
       }
     }
     clearThrottle(email);
-    createSession(req, res, user.id);
+
+    // A seat's own row (org_owner_id set) authenticates here, but the
+    // session — and everything downstream — runs as the org root. See the
+    // comment on auth() above.
+    const isSeat = !!user.org_owner_id;
+    const rootId = user.org_owner_id || user.id;
+    const rootUser = isSeat ? db.prepare('SELECT * FROM users WHERE id=?').get(rootId) : user;
+    createSession(req, res, rootId, { actingSeatId: isSeat ? user.id : null });
     writeAudit(req, { userId: user.id, action: 'LOGIN', details: `${user.email} logged in`, entityType: 'user', entityId: user.id });
-    res.json({ user: toPublicUser(user) });
+    res.json({
+      user: toPublicUser(rootUser),
+      actingAs: isSeat ? { id: user.id, email: user.email, displayName: user.display_name, seatRole: user.seat_role } : null,
+    });
   })
 );
 
@@ -358,7 +406,12 @@ app.get('/api/auth/me', auth(), (req, res) => {
   const impersonatedBy = impersonatingAdminId
     ? db.prepare('SELECT id, email FROM users WHERE id=?').get(impersonatingAdminId)
     : null;
-  res.json({ user: { ...toPublicUser(req.user), impersonating: !!impersonatedBy, impersonatedBy } });
+  const actingSeatId = req.session.acting_seat_id;
+  const actingSeat = actingSeatId ? db.prepare('SELECT id, email, display_name, seat_role FROM users WHERE id=?').get(actingSeatId) : null;
+  res.json({
+    user: { ...toPublicUser(req.user), impersonating: !!impersonatedBy, impersonatedBy },
+    actingAs: actingSeat ? { id: actingSeat.id, email: actingSeat.email, displayName: actingSeat.display_name, seatRole: actingSeat.seat_role } : null,
+  });
 });
 
 app.post('/api/auth/logout', auth(), (req, res) => {
@@ -368,20 +421,24 @@ app.post('/api/auth/logout', auth(), (req, res) => {
   res.json({ ok: true });
 });
 
+// MFA lives on whichever row the caller actually logs in with — req.actorId
+// (the seat's own row, if a seat is acting), not req.user.id (the org
+// root). Keying this off the root would silently no-op for a seat: login
+// checks MFA on the row found by email, which for a seat is their own row.
 app.post('/api/auth/mfa/setup', auth(), (req, res) => {
   const secret = totp.randomBase32Secret();
-  db.prepare('UPDATE users SET mfa_secret=?, mfa_enabled=1 WHERE id=?').run(secret, req.user.id);
-  writeAudit(req, { userId: req.user.id, action: 'MFA_ENABLE', entityType: 'user', entityId: req.user.id });
-  res.json({ ok: true, secret, otpauthUrl: totp.provisioningUrl(secret, req.user.email) });
+  db.prepare('UPDATE users SET mfa_secret=?, mfa_enabled=1 WHERE id=?').run(secret, req.actorId);
+  writeAudit(req, { userId: req.actorId, action: 'MFA_ENABLE', entityType: 'user', entityId: req.actorId });
+  res.json({ ok: true, secret, otpauthUrl: totp.provisioningUrl(secret, req.actorLabel) });
 });
 
 app.post('/api/auth/mfa/disable', auth(), (req, res) => {
-  db.prepare('UPDATE users SET mfa_secret=NULL, mfa_enabled=0 WHERE id=?').run(req.user.id);
-  writeAudit(req, { userId: req.user.id, action: 'MFA_DISABLE', entityType: 'user', entityId: req.user.id });
+  db.prepare('UPDATE users SET mfa_secret=NULL, mfa_enabled=0 WHERE id=?').run(req.actorId);
+  writeAudit(req, { userId: req.actorId, action: 'MFA_DISABLE', entityType: 'user', entityId: req.actorId });
   res.json({ ok: true });
 });
 
-app.patch('/api/profile', auth(), (req, res) => {
+app.patch('/api/profile', auth(), requireSeatRole(['OPS']), (req, res) => {
   const b = req.body || {};
   const fields = {
     company_name: b.companyName,
@@ -408,6 +465,66 @@ app.patch('/api/profile', auth(), (req, res) => {
   }
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
   res.json({ user: toPublicUser(user) });
+});
+
+// -----------------------------------------------------------------------
+// Multi-seat company accounts. A seat is a normal `users` row (own email,
+// password, own optional MFA) with org_owner_id pointing at the account
+// that owns the company profile. Seats log in with their own credentials
+// (see the login route above) but operate as that org for every job/bid/
+// payout — see the comment on auth() for why. Only the org root can add,
+// re-role, or deactivate a seat; any org member can view the roster.
+// -----------------------------------------------------------------------
+
+const SEAT_ROLES = ['OPS', 'FINANCE', 'VIEWER'];
+
+app.get('/api/org/members', auth(['SHIPPER', 'CARRIER']), (req, res) => {
+  const seats = db
+    .prepare('SELECT id, email, display_name, seat_role, is_active, created_at FROM users WHERE org_owner_id=? ORDER BY created_at ASC')
+    .all(req.user.id);
+  res.json({
+    root: { id: req.user.id, email: req.user.email, displayName: req.user.profile ? req.user.profile.company_name : req.user.email },
+    seats,
+  });
+});
+
+app.post('/api/org/members', auth(['SHIPPER', 'CARRIER']), requireSeatRole([]), (req, res) => {
+  const { email, password, seatRole, displayName } = req.body || {};
+  if (!email || !password) return sendError(res, 400, 'email and password are required');
+  if (!SEAT_ROLES.includes(seatRole)) return sendError(res, 422, `seatRole must be one of ${SEAT_ROLES.join(', ')}`);
+  if (db.prepare('SELECT id FROM users WHERE email=?').get(email)) return sendError(res, 400, 'An account with that email already exists');
+
+  const passwordHash = bcrypt.hashSync(password, 10);
+  const result = db
+    .prepare('INSERT INTO users (email, password_hash, role, tier, org_owner_id, seat_role, display_name, is_verified) VALUES (?,?,?,?,?,?,?,?)')
+    .run(email, passwordHash, req.user.role, 'BRONZE', req.user.id, seatRole, displayName || null, req.user.is_verified ? 1 : 0);
+  const seatId = Number(result.lastInsertRowid);
+  writeAudit(req, { userId: req.actorId, action: 'ORG_MEMBER_ADD', details: `Added seat ${email} (${seatRole})`, entityType: 'user', entityId: seatId });
+  const seat = db.prepare('SELECT id, email, display_name, seat_role, is_active, created_at FROM users WHERE id=?').get(seatId);
+  res.status(201).json({ seat });
+});
+
+app.patch('/api/org/members/:id', auth(['SHIPPER', 'CARRIER']), requireSeatRole([]), (req, res) => {
+  const seat = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
+  if (!seat || seat.org_owner_id !== req.user.id) return sendError(res, 404, 'Seat not found');
+  const { seatRole, isActive } = req.body || {};
+  if (seatRole !== undefined && !SEAT_ROLES.includes(seatRole)) return sendError(res, 422, `seatRole must be one of ${SEAT_ROLES.join(', ')}`);
+
+  const sets = [];
+  const params = [];
+  if (seatRole !== undefined) { sets.push('seat_role=?'); params.push(seatRole); }
+  if (isActive !== undefined) { sets.push('is_active=?'); params.push(isActive ? 1 : 0); }
+  if (sets.length) {
+    params.push(seat.id);
+    db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id=?`).run(...params);
+    // Deactivating a seat must also kill any live session for it immediately —
+    // otherwise a seat already logged in stays fully active until their
+    // cookie naturally expires, up to 7 days later.
+    if (isActive === false) db.prepare('DELETE FROM sessions WHERE acting_seat_id=?').run(seat.id);
+  }
+  writeAudit(req, { userId: req.actorId, action: 'ORG_MEMBER_UPDATE', details: `Updated seat #${seat.id}`, entityType: 'user', entityId: seat.id });
+  const updated = db.prepare('SELECT id, email, display_name, seat_role, is_active, created_at FROM users WHERE id=?').get(seat.id);
+  res.json({ seat: updated });
 });
 
 // =============================================================================
@@ -480,7 +597,7 @@ app.post('/api/bids/:id/withdraw', auth(['CARRIER']), (req, res) => {
   if (bid.carrier_id !== req.user.id) return sendError(res, 403, 'Not your bid');
   if (bid.status !== 'PENDING') return sendError(res, 400, 'Only a pending bid can be withdrawn');
   db.prepare(`UPDATE bids SET status='WITHDRAWN', updated_at=datetime('now') WHERE id=?`).run(bid.id);
-  writeAudit(req, { userId: req.user.id, action: 'BID_WITHDRAW', details: `Withdrew bid #${bid.id}`, entityType: 'bid', entityId: bid.id, beforeState: 'PENDING', afterState: 'WITHDRAWN' });
+  writeAudit(req, { userId: req.actorId, action: 'BID_WITHDRAW', details: `Withdrew bid #${bid.id}`, entityType: 'bid', entityId: bid.id, beforeState: 'PENDING', afterState: 'WITHDRAWN' });
   const updated = db.prepare('SELECT * FROM bids WHERE id=?').get(bid.id);
   res.json({ ok: true, bid: updated });
 });
@@ -507,7 +624,7 @@ app.get('/api/jobs', auth(), (req, res) => {
   res.json({ jobs });
 });
 
-app.post('/api/jobs', auth(['SHIPPER']), writeLimiter, (req, res) => {
+app.post('/api/jobs', auth(['SHIPPER']), writeLimiter, requireSeatRole(['OPS']), (req, res) => {
   const b = req.body || {};
   const required = ['pickupTerminal', 'deliveryArea', 'deliveryAddress', 'readyAt', 'deadline'];
   for (const f of required) if (!b[f]) return sendError(res, 400, `${f} is required`);
@@ -563,7 +680,7 @@ app.post('/api/jobs', auth(['SHIPPER']), writeLimiter, (req, res) => {
       truckCount
     );
   const jobId = Number(result.lastInsertRowid);
-  writeAudit(req, { userId: req.user.id, action: 'JOB_CREATE', details: `${code} posted`, entityType: 'job', entityId: jobId, afterState: 'OPEN' });
+  writeAudit(req, { userId: req.actorId, action: 'JOB_CREATE', details: `${code} posted`, entityType: 'job', entityId: jobId, afterState: 'OPEN' });
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
   res.status(201).json({ job });
 });
@@ -587,7 +704,7 @@ app.get('/api/jobs/:id', auth(), (req, res) => {
   res.json({ job, bids, documents, payout });
 });
 
-app.post('/api/jobs/:id/bids', auth(['CARRIER']), writeLimiter, (req, res) => {
+app.post('/api/jobs/:id/bids', auth(['CARRIER']), writeLimiter, requireSeatRole(['OPS']), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
   if (job.status !== 'OPEN') return sendError(res, 403, 'Job is not open for bidding.');
@@ -607,7 +724,7 @@ app.post('/api/jobs/:id/bids', auth(['CARRIER']), writeLimiter, (req, res) => {
     .prepare('INSERT INTO bids (job_id, carrier_id, amount_aed, eta_minutes, truck_type, driver_name, driver_phone, notes) VALUES (?,?,?,?,?,?,?,?)')
     .run(job.id, req.user.id, amount, eta, b.truckType || null, b.driverName, driverPhone, b.notes || null);
   const bidId = Number(result.lastInsertRowid);
-  writeAudit(req, { userId: req.user.id, action: 'BID_CREATE', details: `Bid AED ${amount} on ${job.job_code}`, entityType: 'bid', entityId: bidId });
+  writeAudit(req, { userId: req.actorId, action: 'BID_CREATE', details: `Bid AED ${amount} on ${job.job_code}`, entityType: 'bid', entityId: bidId });
   notify(job.shipper_id, 'New bid received', `${req.user.profile.company_name} bid AED ${amount} on ${job.job_code}.`, job.id);
   const bid = db.prepare('SELECT * FROM bids WHERE id=?').get(bidId);
   res.status(201).json({ bid });
@@ -642,7 +759,7 @@ app.post('/api/jobs/:id/optimize-route', auth(), (req, res) => {
   res.json(result);
 });
 
-app.post('/api/jobs/:id/award', auth(['SHIPPER']), (req, res) => {
+app.post('/api/jobs/:id/award', auth(['SHIPPER']), requireSeatRole(['OPS']), (req, res) => {
   const jobId = Number(req.params.id);
   const { bidId } = req.body || {};
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
@@ -677,7 +794,7 @@ app.post('/api/jobs/:id/award', auth(['SHIPPER']), (req, res) => {
       .run(jobId, bid.carrier_id, gross, fee, net);
 
     writeAudit(req, {
-      userId: req.user.id,
+      userId: req.actorId,
       action: 'AWARD',
       details: `${freshJob.job_code} awarded to carrier #${bid.carrier_id} at AED ${gross}`,
       entityType: 'job',
@@ -705,7 +822,7 @@ const TRANSITIONS = {
   CARRIER: { AWARDED: ['PICKED_UP', 'CANCELLED'], PICKED_UP: ['IN_TRANSIT'], IN_TRANSIT: ['DELIVERED'] },
 };
 
-app.patch('/api/jobs/:id/status', auth(), (req, res) => {
+app.patch('/api/jobs/:id/status', auth(), requireSeatRole(['OPS']), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
   const { status: next } = req.body || {};
@@ -733,7 +850,7 @@ app.patch('/api/jobs/:id/status', auth(), (req, res) => {
   }
 
   writeAudit(req, {
-    userId: req.user.id,
+    userId: req.actorId,
     action: 'STATUS',
     details: `${job.job_code}: ${job.status} -> ${next}`,
     entityType: 'job',
@@ -753,7 +870,7 @@ app.patch('/api/jobs/:id/status', auth(), (req, res) => {
 // trail is exactly the container-theft vector (S1) this binding exists to
 // close. "Re-verification" here means re-supplying and re-validating both
 // fields, the same bar as the original bid, not just patching one field.
-app.patch('/api/jobs/:id/driver', auth(['CARRIER']), (req, res) => {
+app.patch('/api/jobs/:id/driver', auth(['CARRIER']), requireSeatRole(['OPS']), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
   if (job.carrier_id !== req.user.id) return sendError(res, 403, 'Not your job');
@@ -771,7 +888,7 @@ app.patch('/api/jobs/:id/driver', auth(['CARRIER']), (req, res) => {
     job.id
   );
   writeAudit(req, {
-    userId: req.user.id,
+    userId: req.actorId,
     action: 'DRIVER_REASSIGN',
     details: `${job.job_code}: driver changed from ${job.assigned_driver_name || 'unset'} (${job.assigned_driver_phone || 'unset'}) to ${driverName} (${normalizedPhone})`,
     entityType: 'job',
@@ -784,7 +901,7 @@ app.patch('/api/jobs/:id/driver', auth(['CARRIER']), (req, res) => {
   res.json({ job: updated });
 });
 
-app.post('/api/jobs/:id/pod', auth(['CARRIER']), (req, res) => {
+app.post('/api/jobs/:id/pod', auth(['CARRIER']), requireSeatRole(['OPS']), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
   if (job.carrier_id !== req.user.id) return sendError(res, 403, 'Not your job');
@@ -795,14 +912,14 @@ app.post('/api/jobs/:id/pod', auth(['CARRIER']), (req, res) => {
   if (doc) {
     db.prepare('INSERT INTO job_documents (job_id, uploader_id, doc_type, title, file_url) VALUES (?,?,?,?,?)').run(
       job.id,
-      req.user.id,
+      req.actorId,
       DOC_TYPES.includes(doc.docType) ? doc.docType : 'POD',
       doc.title || 'Proof of Delivery',
       doc.fileUrl || ''
     );
   }
   writeAudit(req, {
-    userId: req.user.id,
+    userId: req.actorId,
     action: 'STATUS',
     details: `${job.job_code}: POD submitted`,
     entityType: 'job',
@@ -866,12 +983,12 @@ app.post('/api/jobs/:id/documents', auth(), (req, res) => {
   if (!b.title || !b.fileUrl) return sendError(res, 400, 'title and fileUrl are required');
   db.prepare('INSERT INTO job_documents (job_id, uploader_id, doc_type, title, file_url) VALUES (?,?,?,?,?)').run(
     job.id,
-    req.user.id,
+    req.actorId,
     DOC_TYPES.includes(b.docType) ? b.docType : 'OTHER',
     b.title,
     b.fileUrl
   );
-  writeAudit(req, { userId: req.user.id, action: 'DOCUMENT_ADD', details: `${b.docType || 'OTHER'} on ${job.job_code}`, entityType: 'job', entityId: job.id });
+  writeAudit(req, { userId: req.actorId, action: 'DOCUMENT_ADD', details: `${b.docType || 'OTHER'} on ${job.job_code}`, entityType: 'job', entityId: job.id });
   res.status(201).json({ ok: true });
 });
 
@@ -893,7 +1010,7 @@ app.post('/api/jobs/:id/rating', auth(), (req, res) => {
   db.prepare('INSERT INTO ratings (job_id, rater_id, ratee_id, score, comment) VALUES (?,?,?,?,?)').run(job.id, req.user.id, rateeId, score, b.comment || null);
   const agg = db.prepare('SELECT AVG(score) avg, COUNT(*) n FROM ratings WHERE ratee_id=?').get(rateeId);
   db.prepare('UPDATE profiles SET rating_avg=?, completed_jobs=completed_jobs+1 WHERE user_id=?').run(Math.round(agg.avg * 100) / 100, rateeId);
-  writeAudit(req, { userId: req.user.id, action: 'RATING', details: `${score}/5 on ${job.job_code}`, entityType: 'job', entityId: job.id });
+  writeAudit(req, { userId: req.actorId, action: 'RATING', details: `${score}/5 on ${job.job_code}`, entityType: 'job', entityId: job.id });
   res.status(201).json({ ok: true });
 });
 
@@ -911,7 +1028,7 @@ app.post('/api/jobs/:id/messages', auth(), (req, res) => {
   if (!isParticipantOrBidder(job, req.user)) return sendError(res, 403, 'Not permitted');
   const { content } = req.body || {};
   if (!content || !content.trim()) return sendError(res, 400, 'content is required');
-  const result = db.prepare('INSERT INTO messages (job_id, sender_id, content) VALUES (?,?,?)').run(job.id, req.user.id, content.trim());
+  const result = db.prepare('INSERT INTO messages (job_id, sender_id, content) VALUES (?,?,?)').run(job.id, req.actorId, content.trim());
   const other = req.user.id === job.shipper_id ? job.carrier_id : job.shipper_id;
   notify(other, 'New message', `New message on ${job.job_code}`, job.id);
   const message = db.prepare('SELECT * FROM messages WHERE id=?').get(Number(result.lastInsertRowid));
@@ -956,7 +1073,7 @@ app.post('/api/templates/:id/rerun', auth(['SHIPPER']), (req, res) => {
        VALUES (?,?,?,?,?,?,?,?,?,?,'OPEN','PENDING',?)`
     )
     .run(code, req.user.id, tpl.id, tpl.container_size, tpl.container_type, tpl.pickup_terminal, tpl.delivery_area, tpl.delivery_address, readyAt, deadline, tpl.notes);
-  writeAudit(req, { userId: req.user.id, action: 'JOB_CREATE', details: `${code} posted from template "${tpl.name}"`, entityType: 'job', entityId: Number(result.lastInsertRowid) });
+  writeAudit(req, { userId: req.actorId, action: 'JOB_CREATE', details: `${code} posted from template "${tpl.name}"`, entityType: 'job', entityId: Number(result.lastInsertRowid) });
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(Number(result.lastInsertRowid));
   res.status(201).json({ job });
 });
@@ -1124,10 +1241,10 @@ app.post('/api/admin/verify/:id', auth(['ADMIN']), (req, res) => {
     if (!iban && !existingIban) return sendError(res, 400, 'IBAN is required to approve verification');
     db.prepare('UPDATE users SET is_verified=1 WHERE id=?').run(carrier.id);
     db.prepare(`UPDATE profiles SET verified_at=datetime('now'), iban=COALESCE(?, iban) WHERE user_id=?`).run(iban ? encryptField(iban) : null, carrier.id);
-    writeAudit(req, { userId: req.user.id, action: 'VERIFY', details: `Approved carrier #${carrier.id}`, entityType: 'user', entityId: carrier.id, afterState: 'VERIFIED' });
+    writeAudit(req, { userId: req.actorId, action: 'VERIFY', details: `Approved carrier #${carrier.id}`, entityType: 'user', entityId: carrier.id, afterState: 'VERIFIED' });
     notify(carrier.id, 'Verification approved', 'You can now bid on open loads.');
   } else {
-    writeAudit(req, { userId: req.user.id, action: 'VERIFY', details: `Rejected carrier #${carrier.id}`, entityType: 'user', entityId: carrier.id, afterState: 'REJECTED' });
+    writeAudit(req, { userId: req.actorId, action: 'VERIFY', details: `Rejected carrier #${carrier.id}`, entityType: 'user', entityId: carrier.id, afterState: 'REJECTED' });
     notify(carrier.id, 'Verification rejected', 'Your verification could not be approved. Contact support.');
   }
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(carrier.id);
@@ -1216,7 +1333,7 @@ app.post('/api/admin/impersonate/:userId', auth(['ADMIN']), (req, res) => {
   if (target.role === 'ADMIN') return sendError(res, 400, 'Cannot impersonate another admin');
   createSession(req, res, target.id, { impersonatingAdminId: req.user.id, maxAgeSeconds: 30 * 60 });
   writeAudit(req, {
-    userId: req.user.id,
+    userId: req.actorId,
     action: 'IMPERSONATE_START',
     details: `Admin ${req.user.email} started impersonating ${target.email} (#${target.id})`,
     entityType: 'user',
@@ -1231,7 +1348,7 @@ app.post('/api/admin/confirm-receipt', auth(['ADMIN']), (req, res) => {
   if (!job) return sendError(res, 404, 'Job not found');
   if (job.escrow_status !== 'HELD') return sendError(res, 400, 'Escrow must be HELD to confirm receipt');
   db.prepare(`UPDATE jobs SET escrow_status='FUNDED', updated_at=datetime('now') WHERE id=?`).run(job.id);
-  writeAudit(req, { userId: req.user.id, action: 'ESCROW_FUND', details: `${job.job_code} funds confirmed received`, entityType: 'job', entityId: job.id, beforeState: 'HELD', afterState: 'FUNDED' });
+  writeAudit(req, { userId: req.actorId, action: 'ESCROW_FUND', details: `${job.job_code} funds confirmed received`, entityType: 'job', entityId: job.id, beforeState: 'HELD', afterState: 'FUNDED' });
   res.json({ ok: true });
 });
 
@@ -1255,7 +1372,7 @@ app.post('/api/admin/disputes', auth(['ADMIN']), (req, res) => {
 
   const result = db.prepare('INSERT INTO disputes (job_id, opened_by, reason, status) VALUES (?,?,?,\'OPEN\')').run(job.id, req.user.id, reason);
   db.prepare(`UPDATE jobs SET status='DISPUTED', escrow_status='DISPUTED', updated_at=datetime('now') WHERE id=?`).run(job.id);
-  writeAudit(req, { userId: req.user.id, action: 'DISPUTE_OPEN', details: reason, entityType: 'job', entityId: job.id, beforeState: job.status, afterState: 'DISPUTED' });
+  writeAudit(req, { userId: req.actorId, action: 'DISPUTE_OPEN', details: reason, entityType: 'job', entityId: job.id, beforeState: job.status, afterState: 'DISPUTED' });
   notify(job.shipper_id, 'Dispute opened', `A dispute was opened on ${job.job_code}. Escrow is frozen.`, job.id);
   notify(job.carrier_id, 'Dispute opened', `A dispute was opened on ${job.job_code}. Escrow is frozen.`, job.id);
   const dispute = db.prepare('SELECT * FROM disputes WHERE id=?').get(Number(result.lastInsertRowid));
@@ -1283,7 +1400,7 @@ app.post('/api/admin/disputes/:id/resolve', auth(['ADMIN']), (req, res) => {
     req.user.id,
     dispute.id
   );
-  writeAudit(req, { userId: req.user.id, action: 'DISPUTE_RESOLVE', details: `${decision}: ${determination || ''}`, entityType: 'dispute', entityId: dispute.id, beforeState: 'OPEN', afterState: 'RESOLVED' });
+  writeAudit(req, { userId: req.actorId, action: 'DISPUTE_RESOLVE', details: `${decision}: ${determination || ''}`, entityType: 'dispute', entityId: dispute.id, beforeState: 'OPEN', afterState: 'RESOLVED' });
   notify(job.shipper_id, 'Dispute resolved', `${job.job_code}: ${decision.replaceAll('_', ' ')}.`, job.id);
   notify(job.carrier_id, 'Dispute resolved', `${job.job_code}: ${decision.replaceAll('_', ' ')}.`, job.id);
   res.json({ ok: true });
@@ -1351,7 +1468,7 @@ app.post('/api/admin/payouts/:id/mark-transferred', auth(['ADMIN']), (req, res) 
   const { reference } = req.body || {};
   db.prepare(`UPDATE payouts SET transfer_executed_at=datetime('now'), transfer_reference=? WHERE id=?`).run(reference || null, payout.id);
   writeAudit(req, {
-    userId: req.user.id,
+    userId: req.actorId,
     action: 'PAYOUT_TRANSFER_CONFIRMED',
     details: `Payout #${payout.id} (AED ${payout.net_aed}) confirmed transferred${reference ? ` — ref ${reference}` : ''}`,
     entityType: 'payout',
@@ -1377,7 +1494,7 @@ app.patch('/api/admin/settings', auth(['ADMIN']), (req, res) => {
     if (auto_release_hours < 1 || auto_release_hours > 168) return sendError(res, 400, 'auto_release_hours must be 1-168');
     db.prepare('UPDATE settings SET value=? WHERE key=\'auto_release_hours\'').run(String(auto_release_hours));
   }
-  writeAudit(req, { userId: req.user.id, action: 'SETTINGS_UPDATE', details: JSON.stringify(req.body) });
+  writeAudit(req, { userId: req.actorId, action: 'SETTINGS_UPDATE', details: JSON.stringify(req.body) });
   res.json({ settings: getSettings() });
 });
 

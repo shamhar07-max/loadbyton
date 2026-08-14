@@ -33,7 +33,7 @@ const NAV_BY_ROLE = {
 };
 
 export function Shell({ children }) {
-  const { user, logout, theme, setTheme, walkthroughFinished, walkthroughStep, completeWalkthrough, setWalkthroughStep, endImpersonation } = useAuth();
+  const { user, logout, theme, setTheme, walkthroughFinished, walkthroughStep, completeWalkthrough, setWalkthroughStep, endImpersonation, actingAs } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -119,8 +119,11 @@ export function Shell({ children }) {
                   {menuOpen && (
                     <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-lg border bg-surface shadow-lg" style={{ borderColor: 'var(--border-default)' }} onMouseLeave={() => setMenuOpen(false)}>
                       <div className="border-b px-4 py-3" style={{ borderColor: 'var(--border-default)' }}>
-                        <p className="truncate text-sm font-medium text-ink">{user.email}</p>
-                        <p className="text-xs text-ink-muted">{user.role} · {user.tier}</p>
+                        <p className="truncate text-sm font-medium text-ink">{actingAs ? actingAs.displayName || actingAs.email : user.email}</p>
+                        <p className="text-xs text-ink-muted">
+                          {actingAs ? `Seat · ${actingAs.seatRole}` : `${user.role} · ${user.tier}`}
+                        </p>
+                        {actingAs && <p className="mt-1 text-xs text-ink-muted">Acting on behalf of {user.profile?.company_name || user.email}</p>}
                       </div>
                       <Link to="/profile" className="block px-4 py-2.5 text-sm text-ink-secondary hover:bg-raised" onClick={() => setMenuOpen(false)}>
                         Profile & settings

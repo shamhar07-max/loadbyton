@@ -42,6 +42,20 @@ for orientation, `docs/ARCHITECTURE.md` before touching business logic, and
   transaction to prevent a double-award race. Don't "simplify" this re-check away.
 - Raw DB rows (jobs, bids, etc.) carry SQLite `INTEGER` 0/1 for boolean-ish columns —
   see the JSX gotcha below before using one in a React conditional.
+- **Multi-seat accounts: `req.user.id` is always the org root, `req.actorId` is who's
+  actually logged in.** A seat authenticates with its own email/password, but its
+  session keys off the org root's id (`sessions.user_id`) — that's what makes every
+  existing `job.shipper_id`/`carrier_id` ownership check, the verification gate, and
+  `req.user.profile` keep working unmodified for a seat, since the seat *is* the org
+  for the duration of the request. Use `req.user.id` for anything ownership/data-scoped
+  (jobs, bids, payouts, templates, contracts, profile). Use `req.actorId` (falls back to
+  `req.user.id` for a root, since a root's own id is both) for anything that should
+  identify the *specific person* acting — `audit_log.user_id`, `messages.sender_id`,
+  `job_documents.uploader_id`, and the MFA row (MFA lives on whichever row someone
+  actually logs in with, never on the root when a seat is driving). Gate mutating
+  routes a VIEWER/FINANCE seat shouldn't reach with `requireSeatRole([...])`, not a
+  role check alone — `auth(['SHIPPER'])` matches a seat too, since a seat inherits the
+  root's `role`.
 
 ## Frontend conventions
 

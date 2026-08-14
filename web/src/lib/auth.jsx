@@ -5,6 +5,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [actingAs, setActingAs] = useState(null);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('loadbyton-theme');
@@ -34,7 +35,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     api
       .me()
-      .then((d) => setUser(d.user))
+      .then((d) => { setUser(d.user); setActingAs(d.actingAs || null); })
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
@@ -42,23 +43,27 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (body) => {
     const d = await api.login(body);
     setUser(d.user);
+    setActingAs(d.actingAs || null);
     return d.user;
   }, []);
 
   const register = useCallback(async (body) => {
     const d = await api.register(body);
     setUser(d.user);
+    setActingAs(null);
     return d.user;
   }, []);
 
   const logout = useCallback(async () => {
     await api.logout().catch(() => {});
     setUser(null);
+    setActingAs(null);
   }, []);
 
   const refresh = useCallback(async () => {
     const d = await api.me();
     setUser(d.user);
+    setActingAs(d.actingAs || null);
     return d.user;
   }, []);
 
@@ -87,6 +92,7 @@ export function AuthProvider({ children }) {
         user, loading, login, register, logout, refresh, endImpersonation, theme, setTheme,
         walkthroughStep, setWalkthroughStep, walkthroughFinished, completeWalkthrough, restartWalkthrough,
         userRole: user?.role,
+        actingAs, isOrgRoot: !actingAs,
       }}
     >
       {children}

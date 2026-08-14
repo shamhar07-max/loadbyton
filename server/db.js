@@ -267,6 +267,12 @@ addColumn('jobs', 'truck_count', 'truck_count INTEGER NOT NULL DEFAULT 1');
 addColumn('jobs', 'equipment_type', "equipment_type TEXT NOT NULL DEFAULT 'CONTAINER_CHASSIS'");
 
 addColumn('sessions', 'impersonating_admin_id', 'impersonating_admin_id INTEGER');
+// A seat logs in with their own credentials, but the session still keys
+// off the ORG ROOT's user id (sessions.user_id) — that is what makes every
+// existing shipper_id/carrier_id ownership check in this file keep working
+// unmodified for seats. acting_seat_id is who's actually driving, for audit
+// attribution and role gating only.
+addColumn('sessions', 'acting_seat_id', 'acting_seat_id INTEGER REFERENCES users(id)');
 
 addColumn('payouts', 'release_type', 'release_type TEXT');
 
@@ -287,6 +293,18 @@ addColumn('jobs', 'assigned_driver_phone', 'assigned_driver_phone TEXT');
 addColumn('payouts', 'sla_deadline', 'sla_deadline TEXT');
 addColumn('payouts', 'transfer_executed_at', 'transfer_executed_at TEXT');
 addColumn('payouts', 'transfer_reference', 'transfer_reference TEXT');
+
+// Multi-seat company accounts. Deliberately additive, not a rewrite of the
+// ownership model: jobs/bids/payouts still key off a single users.id (now
+// always the ORG ROOT's id, never a seat's), so none of that schema or the
+// money-critical logic around it changes. A "seat" is just another users
+// row with org_owner_id pointing at the root and a narrower seat_role.
+// NULL org_owner_id means "this row IS an org root" (the pre-existing,
+// single-account behavior — every current user stays a root, unaffected).
+addColumn('users', 'org_owner_id', 'org_owner_id INTEGER REFERENCES users(id)');
+addColumn('users', 'seat_role', 'seat_role TEXT'); // OPS | FINANCE | VIEWER — NULL for org roots
+addColumn('users', 'is_active', 'is_active INTEGER NOT NULL DEFAULT 1');
+addColumn('users', 'display_name', 'display_name TEXT'); // seat's own name, distinct from the org's company_name
 
 addColumn('audit_log', 'entity_type', 'entity_type TEXT');
 addColumn('audit_log', 'entity_id', 'entity_id INTEGER');
