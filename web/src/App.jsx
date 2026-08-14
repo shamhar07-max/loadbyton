@@ -22,6 +22,8 @@ import Features from './pages/Features.jsx';
 import Pricing from './pages/Pricing.jsx';
 import About from './pages/About.jsx';
 import Blog from './pages/Blog.jsx';
+import Security from './pages/Security.jsx';
+import Compliance from './pages/Compliance.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 function FullScreenSpinner() {
@@ -57,6 +59,8 @@ export default function App() {
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/about" element={<About />} />
         <Route path="/blog" element={<Blog />} />
+        <Route path="/security" element={<Security />} />
+        <Route path="/compliance" element={<Compliance />} />
 
         <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
         <Route path="/register" element={<GuestOnly><Register /></GuestOnly>} />

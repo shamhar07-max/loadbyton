@@ -1518,6 +1518,8 @@ const SEO_META = {
   '/pricing': { title: 'Pricing — Loadbyton', description: 'A transparent 6% take rate, no subscription. See how Loadbyton pricing compares to broker markups.' },
   '/about': { title: 'About — Loadbyton', description: 'Loadbyton is a UAE container drayage marketplace built to make the second shipment happen on-platform, not on WhatsApp.' },
   '/blog': { title: 'Blog — Loadbyton', description: 'Notes on UAE drayage, demurrage, and building a freight marketplace that survives past the first job.' },
+  '/security': { title: 'Security — Loadbyton', description: 'How Loadbyton protects account, financial, and shipment data — what is built today, and what is on the roadmap.' },
+  '/compliance': { title: 'Compliance — Loadbyton', description: 'How Loadbyton handles personal data under UAE PDPL, VAT invoicing, and where account data is hosted.' },
 };
 
 function renderSeoPage(res, meta) {
@@ -1546,7 +1548,7 @@ if (fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR, { index: false }));
 }
 
-app.get(['/features', '/pricing', '/about', '/blog'], (req, res) => renderSeoPage(res, SEO_META[req.path]));
+app.get(['/features', '/pricing', '/about', '/blog', '/security', '/compliance'], (req, res) => renderSeoPage(res, SEO_META[req.path]));
 
 app.use('/api', (req, res) => sendError(res, 404, 'Not found'));
 

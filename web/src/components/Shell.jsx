@@ -197,6 +197,8 @@ export function Shell({ children }) {
             <Link to="/pricing" className="hover:text-ink">Pricing</Link>
             <Link to="/about" className="hover:text-ink">About</Link>
             <Link to="/blog" className="hover:text-ink">Blog</Link>
+            <Link to="/security" className="hover:text-ink">Security</Link>
+            <Link to="/compliance" className="hover:text-ink">Compliance</Link>
           </div>
           <p className="text-xs text-ink-muted">© {new Date().getFullYear()} Loadbyton. Demo system — payouts are simulated, not real transfers.</p>
         </div>
