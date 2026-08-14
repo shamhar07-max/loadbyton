@@ -85,6 +85,30 @@ for orientation, `docs/ARCHITECTURE.md` before touching business logic, and
   `main.jsx`) specifically so a slow or unreachable font CDN never delays first paint
   of the app shell. Keep that pattern if you touch `web/index.html`.
 
+## Prerendering (crawlability, not hydration)
+
+`web/scripts/prerender.mjs` runs after `vite build` (see `web/package.json`)
+and uses Vite's own programmatic SSR API — zero new dependencies — to
+render each public route (`web/src/entry-server.jsx`) to a static HTML
+string via `react-dom/server`, written to `web/dist/__prerendered__/`.
+`server/index.js`'s `renderSeoPage` splices that markup into `<div
+id="root">` for a session-less request, so a non-JS fetcher (a search
+crawler, a link-preview bot, `WebFetch`) sees the real page instead of an
+empty shell.
+
+**This is prerendering for crawlers, not hydration.** `main.jsx` still
+boots with plain `createRoot()`, which replaces the prerendered markup the
+instant client JS mounts — a real browser gets a harmless flash, not a
+persisted SSR DOM. Don't "upgrade" this to `hydrateRoot()` without also
+reconciling the mismatch sources (locale, theme, walkthrough state — see
+the `typeof localStorage !== 'undefined'` guards in `lib/auth.jsx` and
+`lib/i18n.jsx`, needed because this code also runs under Node during the
+prerender step). If you add a new public marketing page, add its route to
+both `ROUTES` in `prerender.mjs` and `SEO_META` in `server/index.js` (with
+a matching `slug`) — miss one and that page silently falls back to the
+pre-prerendering empty-shell behavior, which is safe but loses the
+crawlability fix for that page specifically.
+
 ## Product scope: equipment, volume, UAE-wide
 
 - Loadbyton is **not** container-only or Jebel-Ali-only. `jobs.equipment_type`

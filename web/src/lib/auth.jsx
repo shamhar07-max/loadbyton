@@ -7,16 +7,22 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [actingAs, setActingAs] = useState(null);
   const [loading, setLoading] = useState(true);
+  // typeof-guarded on all three: this module also runs under Node during
+  // build-time prerendering (see scripts/prerender.mjs), where
+  // localStorage doesn't exist — prerender always gets the logged-out,
+  // light-theme, walkthrough-not-finished default, which is correct since
+  // a prerendered page is never shown to an already-signed-in browser
+  // anyway (see the splice logic in server/index.js).
   const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('loadbyton-theme');
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('loadbyton-theme') : null;
     return saved === 'dark' ? 'dark' : 'light';
   });
   const [walkthroughStep, setWalkthroughStepState] = useState(() => {
-    const saved = localStorage.getItem('loadbyton-walkthrough-step');
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('loadbyton-walkthrough-step') : null;
     return saved ? Number(saved) : 0;
   });
   const [walkthroughFinished, setWalkthroughFinished] = useState(
-    () => localStorage.getItem('loadbyton-walkthrough-finished') === 'true'
+    () => (typeof localStorage !== 'undefined' ? localStorage.getItem('loadbyton-walkthrough-finished') === 'true' : true)
   );
 
   useEffect(() => {

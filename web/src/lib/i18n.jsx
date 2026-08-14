@@ -86,7 +86,10 @@ const LocaleContext = createContext(null);
 
 export function LocaleProvider({ children }) {
   const [locale, setLocaleState] = useState(() => {
-    const saved = localStorage.getItem('loadbyton-locale');
+    // typeof-guarded: this module also runs under Node during build-time
+    // prerendering (see scripts/prerender.mjs), where localStorage doesn't
+    // exist — always prerender the English default there.
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('loadbyton-locale') : null;
     return saved === 'ar' ? 'ar' : 'en';
   });
 

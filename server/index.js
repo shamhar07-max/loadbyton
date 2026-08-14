@@ -1513,14 +1513,29 @@ app.patch('/api/admin/settings', auth(['ADMIN']), (req, res) => {
 // 7. SEO pages, static SPA, fallback
 // =============================================================================
 
+const PRERENDER_DIR = path.join(DIST_DIR, '__prerendered__');
+
 const SEO_META = {
-  '/features': { title: 'Features — Loadbyton', description: 'Escrow-backed drayage jobs, live tracking, contract lanes and a verified carrier network — everything Loadbyton ships.' },
-  '/pricing': { title: 'Pricing — Loadbyton', description: 'A transparent 6% take rate, no subscription. See how Loadbyton pricing compares to broker markups.' },
-  '/about': { title: 'About — Loadbyton', description: 'Loadbyton is a UAE container drayage marketplace built to make the second shipment happen on-platform, not on WhatsApp.' },
-  '/blog': { title: 'Blog — Loadbyton', description: 'Notes on UAE drayage, demurrage, and building a freight marketplace that survives past the first job.' },
-  '/security': { title: 'Security — Loadbyton', description: 'How Loadbyton protects account, financial, and shipment data — what is built today, and what is on the roadmap.' },
-  '/compliance': { title: 'Compliance — Loadbyton', description: 'How Loadbyton handles personal data under UAE PDPL, VAT invoicing, and where account data is hosted.' },
+  '/': { title: 'Loadbyton — UAE Road Freight & Container Drayage Marketplace', description: 'Post a freight job — container, flatbed, tripper, or a multi-truck volume inquiry — get verified-carrier bids across Dubai, Abu Dhabi, Sharjah and Fujairah, and move it under escrow with live tracking and payout on delivery.', slug: 'root' },
+  '/features': { title: 'Features — Loadbyton', description: 'Escrow-backed drayage jobs, live tracking, contract lanes and a verified carrier network — everything Loadbyton ships.', slug: 'features' },
+  '/pricing': { title: 'Pricing — Loadbyton', description: 'A transparent 6% take rate, no subscription. See how Loadbyton pricing compares to broker markups.', slug: 'pricing' },
+  '/about': { title: 'About — Loadbyton', description: 'Loadbyton is a UAE container drayage marketplace built to make the second shipment happen on-platform, not on WhatsApp.', slug: 'about' },
+  '/blog': { title: 'Blog — Loadbyton', description: 'Notes on UAE drayage, demurrage, and building a freight marketplace that survives past the first job.', slug: 'blog' },
+  '/security': { title: 'Security — Loadbyton', description: 'How Loadbyton protects account, financial, and shipment data — what is built today, and what is on the roadmap.', slug: 'security' },
+  '/compliance': { title: 'Compliance — Loadbyton', description: 'How Loadbyton handles personal data under UAE PDPL, VAT invoicing, and where account data is hosted.', slug: 'compliance' },
 };
+
+// Reads once at boot rather than per-request — these files only ever
+// change on a fresh deploy (a new build), never while the process is
+// running, so there's no staleness risk from caching them in memory.
+const prerenderedCache = {};
+function loadPrerendered(slug) {
+  if (slug in prerenderedCache) return prerenderedCache[slug];
+  const file = path.join(PRERENDER_DIR, `${slug}.html`);
+  const html = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+  prerenderedCache[slug] = html;
+  return html;
+}
 
 function renderSeoPage(res, meta) {
   if (!fs.existsSync(DIST_INDEX)) {
@@ -1541,6 +1556,19 @@ function renderSeoPage(res, meta) {
     [/(<meta name="twitter:description" content=")[^"]*(")/, `$1${meta.description}$2`],
   ];
   for (const [pattern, replacement] of replacements) html = html.replace(pattern, replacement);
+
+  // The actual crawlability fix: splice build-time-prerendered markup into
+  // the root div, so a non-JS fetcher (a search crawler, a link-preview
+  // bot, WebFetch) sees the real page instead of an empty shell. Falls
+  // back to the untouched empty div — same behavior as before this existed
+  // — if prerendering never ran for this route. This is prerendering for
+  // crawlers, not hydration: main.jsx still boots with plain createRoot(),
+  // which replaces this markup the moment client JS mounts.
+  const prerendered = meta.slug ? loadPrerendered(meta.slug) : null;
+  if (prerendered) {
+    html = html.replace('<div id="root"></div>', `<div id="root">${prerendered}</div>`);
+  }
+
   res.status(200).set('Content-Type', 'text/html').send(html);
 }
 
@@ -1548,7 +1576,7 @@ if (fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR, { index: false }));
 }
 
-app.get(['/features', '/pricing', '/about', '/blog', '/security', '/compliance'], (req, res) => renderSeoPage(res, SEO_META[req.path]));
+app.get(['/', '/features', '/pricing', '/about', '/blog', '/security', '/compliance'], (req, res) => renderSeoPage(res, SEO_META[req.path]));
 
 app.use('/api', (req, res) => sendError(res, 404, 'Not found'));
 
