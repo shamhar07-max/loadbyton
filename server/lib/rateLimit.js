@@ -49,6 +49,18 @@ function rateLimiter({ windowMs, max, keyFn, message }) {
 // app.post/get calls, not mounted globally), so req.user isn't populated
 // yet at this point — matches how the existing login throttle keys by
 // email/IP rather than a not-yet-known user id.
-const byIp = (req) => req.ip;
+//
+// cf-connecting-ip first: the production deployment sits behind Cloudflare
+// AND Render's own edge proxy — two hops before this process ever sees a
+// request. Express's `trust proxy` setting counts hops off
+// X-Forwarded-For, and getting that count wrong (it's not consistently
+// documented how many Render adds) silently collapses every visitor onto
+// one bucket instead of failing loudly. Cloudflare's cf-connecting-ip is
+// set by Cloudflare itself, at the edge, and can't be spoofed by a client
+// (Cloudflare overwrites any client-supplied copy of it) — trusting it
+// when present sidesteps the hop-counting problem entirely. req.ip (via
+// trust proxy) is the fallback for local dev and any deployment not behind
+// Cloudflare.
+const byIp = (req) => req.headers['cf-connecting-ip'] || req.ip;
 
 module.exports = { rateLimiter, byIp };

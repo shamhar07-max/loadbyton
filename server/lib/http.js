@@ -36,6 +36,14 @@ function securityHeaders(req, res, next) {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-XSS-Protection', '0');
+  // req.secure reflects the real client-facing protocol, not the internal
+  // hop to this process, because app.set('trust proxy', ...) makes Express
+  // read it off X-Forwarded-Proto. Gated so a plain-HTTP local dev server
+  // never emits it — browsers ignore HSTS over HTTP anyway, but there's no
+  // reason to send a header that doesn't apply.
+  if (req.secure) {
+    res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  }
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
