@@ -226,9 +226,9 @@ export default function Profile() {
         <Card.Header><Card.Title>Two-factor authentication</Card.Title></Card.Header>
         <Card.Content>
           {user.mfa_enabled ? (
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-ink-secondary">MFA is enabled on your account.</p>
-              <Button variant="danger" onClick={disableMfa} loading={mfaBusy}>Disable</Button>
+              <Button variant="danger" onClick={disableMfa} loading={mfaBusy} className="self-start shrink-0">Disable</Button>
             </div>
           ) : mfa ? (
             <div className="space-y-2 text-sm">
@@ -237,9 +237,9 @@ export default function Profile() {
               <p className="text-xs text-ink-muted break-all">{mfa.otpauthUrl}</p>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-ink-secondary">Add an authenticator app as a second factor on login.</p>
-              <Button variant="secondary" onClick={setupMfa} loading={mfaBusy}>Enable MFA</Button>
+              <Button variant="secondary" onClick={setupMfa} loading={mfaBusy} className="self-start shrink-0">Enable MFA</Button>
             </div>
           )}
         </Card.Content>
@@ -250,9 +250,9 @@ export default function Profile() {
       <Card className="mt-6">
         <Card.Header><Card.Title>Walkthrough</Card.Title></Card.Header>
         <Card.Content>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-ink-secondary">Replay the 3-step welcome walkthrough.</p>
-            <Button variant="secondary" onClick={restartWalkthrough}>Start over</Button>
+            <Button variant="secondary" onClick={restartWalkthrough} className="self-start shrink-0">Start over</Button>
           </div>
         </Card.Content>
       </Card>

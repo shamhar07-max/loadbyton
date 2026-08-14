@@ -274,6 +274,23 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
   animation: panel-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Equipment strip on the landing page — a slow, continuous drift rather
+   than a wall of 12 labeled cards. The track holds two copies of the same
+   list back to back; animating exactly -50% loops seamlessly regardless of
+   viewport width, since that's always "one full copy" of a track sized to
+   its content (w-max). Pauses on hover so a curious visitor can actually
+   read a label instead of chasing it. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 28s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
 /* ------------------------------------------------------------------ */
 /* Component classes — in @layer components so plain Tailwind utility  */
 /* classes (hidden, w-full, sm:inline-flex, …) always win the cascade  */
@@ -283,6 +300,17 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
 @layer components {
   .container-page {
     @apply mx-auto w-full max-w-content px-5 sm:px-6 lg:px-8;
+  }
+
+  /* Fades the trailing edge of a horizontally-scrollable, dir=ltr container
+     (a data table, a tab bar, the job-status stepper) so a mobile user sees
+     a visual cue that there's more content to swipe to, instead of a hard
+     edge that reads as "the page cut off" — these all already scroll
+     correctly, they just gave no hint that they do. Right-edge fade only:
+     every container this is applied to is explicitly dir="ltr". */
+  .scroll-fade-x {
+    mask-image: linear-gradient(to right, black calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent);
   }
 
   .card {

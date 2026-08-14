@@ -44,10 +44,10 @@ export default function Dashboard() {
     setSubmitting(true);
     setError('');
     try {
-      // F11 (gstack review): form never had a job_code field — the server
-      // generates it — so the toast always fell back to "new job". Read it
-      // from the create response instead.
-      const { job } = await api.createJob({
+      // F11, fixed independently on both branches — kept main's optional
+      // chaining (form never had a job_code field; the server generates it,
+      // so the toast always fell back to a placeholder before this).
+      const created = await api.createJob({
         ...form,
         maxBudgetAed: form.maxBudgetAed ? Number(form.maxBudgetAed) : undefined,
         containerCount: Number(form.containerCount) || 1,
@@ -58,7 +58,7 @@ export default function Dashboard() {
       addToast({
         type: 'status_change',
         title: 'Job posted',
-        body: `${job.job_code} posted successfully`,
+        body: `${created.job?.job_code || 'New job'} posted successfully`,
       });
       load();
     } catch (err) {
@@ -232,7 +232,7 @@ export default function Dashboard() {
               <option value="DISPUTED">Disputed</option>
             </Select>
             <div className="mt-3 overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto scroll-fade-x">
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
@@ -252,11 +252,8 @@ export default function Dashboard() {
                           <p className="font-medium text-ink">
                             {CONTAINER_EQUIPMENT.includes(j.equipment_type) ? `${j.container_size} ${formatLabel(j.container_type)}` : equipmentLabel(j.equipment_type)}
                           </p>
-                          {(j.container_count > 1 || j.truck_count > 1) && (
-                            <Badge className="mt-1" color="accent">
-                              {j.container_count > 1 ? `×${j.container_count} containers` : `×${j.truck_count} trucks`}
-                            </Badge>
-                          )}
+                          {j.container_count > 1 && <Badge className="mt-1" color="accent">×{j.container_count} containers</Badge>}
+                          {j.truck_count > 1 && <Badge className="mt-1" color="accent">×{j.truck_count} trucks</Badge>}
                         </td>
                         <td className="px-5 py-3 text-ink-secondary">{formatLabel(j.pickup_terminal)} → {formatLabel(j.delivery_area)}</td>
                         <td className="px-5 py-3"><StatusBadge status={j.status} /></td>

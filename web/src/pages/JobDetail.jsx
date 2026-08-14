@@ -24,7 +24,7 @@ function StatusStepper({ job }) {
   const idx = STATUS_FLOW.indexOf(job.status);
   const terminal = job.status === 'CANCELLED' || job.status === 'DISPUTED';
   return (
-    <div className="flex items-center gap-1 overflow-x-auto pb-1">
+    <div className="flex items-center gap-1 overflow-x-auto scroll-fade-x pb-1">
       {STATUS_FLOW.slice(1).map((s, i) => {
         const stepIdx = STATUS_FLOW.indexOf(s);
         const done = !terminal && stepIdx <= idx;
@@ -348,8 +348,9 @@ function DocumentList({ documents, jobId, onAdd }) {
       setForm({ docType: 'CUSTOMS', title: '', fileUrl: '' });
       onAdd();
     } catch (err) {
-      // F17 (gstack review): this had no catch — a failed add (e.g. a bad
-      // fileUrl) threw as an unhandled rejection and the user saw nothing.
+      // F17, fixed independently on both branches: this had no catch — a
+      // failed add (e.g. a bad fileUrl) threw as an unhandled rejection and
+      // the user saw nothing.
       addToast({ type: 'system_message', title: 'Could not add document', body: err.message });
     } finally {
       setBusy(false);
@@ -370,12 +371,12 @@ function DocumentList({ documents, jobId, onAdd }) {
           ))}
         </ul>
       )}
-      <form onSubmit={submit} className="mt-4 grid grid-cols-[110px,1fr,1fr,auto] gap-2 border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
+      <form onSubmit={submit} className="mt-4 grid grid-cols-1 gap-2 border-t pt-4 sm:grid-cols-[110px,1fr,1fr,auto]" style={{ borderColor: 'var(--border-subtle)' }}>
         <select className="input" value={form.docType} onChange={(e) => setForm({ ...form, docType: e.target.value })}>
           {['CUSTOMS', 'RECEIPT', 'POD', 'LICENCE', 'INSURANCE', 'OTHER'].map((t) => <option key={t}>{t}</option>)}
         </select>
-        <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-        <Input placeholder="File URL" value={form.fileUrl} onChange={(e) => setForm({ ...form, fileUrl: e.target.value })} />
+        <Input placeholder="Title" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        <Input placeholder="File URL" required type="url" value={form.fileUrl} onChange={(e) => setForm({ ...form, fileUrl: e.target.value })} />
         <Button type="submit" variant="secondary" loading={busy}>Add</Button>
       </form>
     </div>
@@ -396,8 +397,8 @@ function MessageThread({ messages, jobId, onSent }) {
       setContent('');
       onSent();
     } catch (err) {
-      // F17 (gstack review): same missing catch as DocumentList — a failed
-      // send silently vanished with no feedback.
+      // F17, fixed independently on both branches: same missing catch as
+      // DocumentList — a failed send silently vanished with no feedback.
       addToast({ type: 'system_message', title: 'Message not sent', body: err.message });
     } finally {
       setBusy(false);
@@ -429,19 +430,20 @@ function RatingForm({ jobId, onDone }) {
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
-  const [error, setError] = useState('');
+  const { addToast } = useToasts();
   async function submit() {
     setBusy(true);
-    setError('');
     try {
       await api.rateJob(jobId, { score, comment });
       setDone(true);
       onDone();
     } catch (err) {
-      // F14 (gstack review): this used to setDone(true) even on failure,
-      // so a rejected rating (e.g. already rated) silently displayed
-      // "Thanks for the rating" — the user had no idea it didn't save.
-      setError(err.message);
+      // F14, fixed independently on both branches — kept main's toast
+      // (consistent with DocumentList/MessageThread above) over this
+      // branch's inline error state. This used to setDone(true) even on
+      // failure, so a rejected rating (e.g. already rated) silently
+      // displayed "Thanks for the rating" with no signal it didn't save.
+      addToast({ type: 'system_message', title: 'Rating not saved', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -456,7 +458,6 @@ function RatingForm({ jobId, onDone }) {
           </button>
         ))}
       </div>
-      {error && <p className="text-sm text-status-danger">{error}</p>}
       <Textarea rows={2} placeholder="Optional comment" value={comment} onChange={(e) => setComment(e.target.value)} />
       <Button onClick={submit} loading={busy}>Submit rating</Button>
     </div>

@@ -15,13 +15,12 @@ export default function WonJobs() {
   const [jobs, setJobs] = useState(null);
 
   useEffect(() => {
-    // F19 (gstack review): the default page size (50, newest first) meant a
-    // carrier with more than 50 total jobs could have older active/won jobs
-    // fall outside the page and silently vanish from this list. Request the
-    // server's max page size instead — bounded by one carrier's own job
-    // history, which realistically won't exceed it.
-    api.listJobs({ limit: 200 }).then((d) => {
-      const won = d.jobs.filter((j) => j.carrier_id === user.id && ACTIVE_STATUSES.includes(j.status));
+    // F19, fixed independently on both branches — kept main's server-side
+    // mine=1 scope (this carrier's own jobs only, any status) over this
+    // branch's client-side limit:200 bump, since it doesn't depend on the
+    // carrier's job count staying under a fixed page size at all.
+    api.listJobs({ mine: 1, limit: 200 }).then((d) => {
+      const won = d.jobs.filter((j) => ACTIVE_STATUSES.includes(j.status));
       setJobs(won);
     }).catch(() => setJobs([]));
   }, [user.id]);
@@ -38,7 +37,7 @@ export default function WonJobs() {
           ) : jobs.length === 0 ? (
             <EmptyState icon={<IconPackage size={28} />} title="No won jobs yet" description="Place bids, get awarded, and start earning." />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto scroll-fade-x">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>

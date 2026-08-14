@@ -19,7 +19,7 @@ export default function Admin() {
       <h1 className="font-display text-2xl font-semibold text-ink">Admin console</h1>
       <p className="mt-1 text-sm text-ink-muted">Verification, escrow oversight, disputes, and the audit trail.</p>
 
-      <div className="mt-6 flex gap-1 overflow-x-auto border-b" style={{ borderColor: 'var(--border-default)' }}>
+      <div className="mt-6 flex gap-1 overflow-x-auto scroll-fade-x border-b" style={{ borderColor: 'var(--border-default)' }}>
         {TABS.map((t) => (
           <button
             key={t}
@@ -62,7 +62,7 @@ function HealthTab() {
       </div>
       <p className="mt-6 mb-3 text-sm font-medium text-ink-secondary">Lane health</p>
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto scroll-fade-x">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
@@ -108,8 +108,8 @@ function VerificationTab() {
       await api.adminVerify(id, { action, iban: ibanDrafts[id] || undefined });
       load();
     } catch (err) {
-      // F16 (gstack review): no catch meant e.g. a missing-IBAN 400 on
-      // approve just... did nothing visible. The admin had no idea it failed.
+      // F16, fixed independently on both branches: no catch meant e.g. a
+      // missing-IBAN 400 on approve did nothing visible.
       addToast({ type: 'system_message', title: 'Could not update verification', body: err.message });
     } finally {
       setBusyId(null);
@@ -168,8 +168,8 @@ function DisputesTab() {
       setForm({ jobId: '', reason: '' });
       load();
     } catch (err) {
-      // F16 (gstack review): no catch here either — e.g. an invalid job ID
-      // failed silently with the form just sitting there.
+      // F16, fixed independently on both branches: no catch here either —
+      // e.g. an invalid job ID failed silently with the form just sitting there.
       addToast({ type: 'system_message', title: 'Could not open dispute', body: err.message });
     } finally {
       setBusy(false);
@@ -307,7 +307,7 @@ function PayoutsSlaTab() {
         <EmptyState icon={<IconCheck size={28} />} title="Nothing outstanding" description="Every released payout has a confirmed transfer." />
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scroll-fade-x">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
@@ -379,8 +379,9 @@ function SettingsTab() {
       setSettings(d.settings);
       setSaved(true);
     } catch (err) {
-      // F16 (gstack review): an out-of-range value (e.g. commission_rate_bps
-      // > 10000) used to 400 with zero on-screen feedback.
+      // F16, fixed independently on both branches: an out-of-range value
+      // (e.g. commission_rate_bps > 10000) used to 400 with zero on-screen
+      // feedback.
       addToast({ type: 'system_message', title: 'Could not save settings', body: err.message });
     } finally {
       setBusy(false);
@@ -393,8 +394,6 @@ function SettingsTab() {
       const d = await api.runAutoRelease();
       setSweepResult(d.message);
     } catch (err) {
-      // Same class of bug as F16 elsewhere in this file — not in the
-      // report's cited line range, but identical pattern right next to it.
       addToast({ type: 'system_message', title: 'Sweep failed', body: err.message });
     } finally {
       setSweeping(false);
@@ -493,7 +492,7 @@ function MembersTab() {
       ) : filteredUsers.length === 0 ? (
         <EmptyState icon={<IconUser size={26} />} title="No members found" description="Try adjusting the filters above." />
       ) : (
-        <div className="mt-6 overflow-x-auto">
+        <div className="mt-6 overflow-x-auto scroll-fade-x">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
@@ -556,7 +555,7 @@ function RegistrationsTab() {
       ) : referrals.length === 0 ? (
         <EmptyState icon={<IconInfo size={26} />} title="No referrals yet" description="Sign-ups that used a referral code will show up here." />
       ) : (
-        <div className="mt-6 overflow-x-auto">
+        <div className="mt-6 overflow-x-auto scroll-fade-x">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>

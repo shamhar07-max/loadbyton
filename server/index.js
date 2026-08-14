@@ -676,14 +676,18 @@ app.patch('/api/org/members/:id', auth(['SHIPPER', 'CARRIER']), requireSeatRole(
 // 3. Public
 // =============================================================================
 
-// gstack review F27: no s-maxage meant Cloudflare (sitting in front of
-// Render) treated every hit as uncacheable and forwarded it straight
-// through — these are read-heavy, low-churn public endpoints, exactly what
-// an edge cache is for. max-age is the browser's own short cache; s-maxage
-// is what Cloudflare actually honors at the edge.
+// gstack review F27 (fixed independently on both branches — this keeps
+// main's version, which additionally covers the cache-miss-stampede case):
+// no s-maxage meant Cloudflare (sitting in front of Render) treated every
+// hit as uncacheable and forwarded it straight through. s-maxage is what
+// Cloudflare actually honors at the edge; max-age=0 keeps browsers always
+// revalidating so a signed-out visitor never sees minutes-stale numbers;
+// stale-while-revalidate covers the gap so a cache miss doesn't block on
+// origin while it refreshes.
+const PUBLIC_JSON_CACHE = 'public, max-age=0, s-maxage=30, stale-while-revalidate=60';
+
 app.get('/api/public/lanes', (req, res) => {
-  // Hardcoded config (server/lib/lanes.js) — changes only on a deploy.
-  res.set('Cache-Control', 'public, max-age=300, s-maxage=3600').json({ lanes: unifiedLanes });
+  res.set('Cache-Control', PUBLIC_JSON_CACHE).json({ lanes: unifiedLanes });
 });
 
 app.get('/api/public/carriers', (req, res) => {
@@ -695,8 +699,7 @@ app.get('/api/public/carriers', (req, res) => {
        ORDER BY p.rating_avg DESC`
     )
     .all();
-  res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
-  res.json({
+  res.set('Cache-Control', PUBLIC_JSON_CACHE).json({
     carriers: rows.map((r) => ({
       id: r.id,
       name: r.company_name,
@@ -715,8 +718,7 @@ app.get('/api/public/market', (req, res) => {
   const openJobs = db.prepare(`SELECT COUNT(*) c FROM jobs WHERE status='OPEN'`).get().c;
   const avgDrayageAED = Math.round(unifiedLanes.reduce((s, l) => s + l.basePriceAed, 0) / unifiedLanes.length);
   const containersPerDay = 300;
-  res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
-  res.json({
+  res.set('Cache-Control', PUBLIC_JSON_CACHE).json({
     market: {
       teu2024: 15200000,
       containersPerDay,
@@ -756,7 +758,11 @@ app.post('/api/bids/:id/withdraw', auth(['CARRIER']), (req, res) => {
 });
 
 app.get('/api/jobs', auth(), (req, res) => {
-  const { status, limit, offset } = req.query;
+  const { status, limit, offset, mine } = req.query;
+  // gstack review F12: negative limit passed through to SQLite's LIMIT
+  // clause unclamped (LIMIT -1 means "no limit" in SQLite) — main's `mine`
+  // param (F19, a different/better fix than the client-side limit:200 bump
+  // this branch used) doesn't touch this, so both fixes are needed here.
   const lim = Math.max(1, Math.min(Number(limit) || 50, 200));
   const off = Number(offset) || 0;
   let where = '1=1';
@@ -765,7 +771,11 @@ app.get('/api/jobs', auth(), (req, res) => {
     where = 'shipper_id = ?';
     params.push(req.user.id);
   } else if (req.user.role === 'CARRIER') {
-    where = "(status = 'OPEN' OR carrier_id = ?)";
+    // mine=1 scopes to jobs actually awarded to this carrier, regardless of
+    // status — used by the won-jobs list, which has no use for the flood of
+    // other shippers' OPEN jobs that the default (bidding) view mixes in and
+    // that can push a carrier's own older awarded jobs past the page limit.
+    where = mine ? 'carrier_id = ?' : "(status = 'OPEN' OR carrier_id = ?)";
     params.push(req.user.id);
   }
   if (status) {
@@ -1801,28 +1811,31 @@ function renderSeoPage(res, meta) {
     html = html.replace('<div id="root"></div>', `<div id="root">${prerendered}</div>`);
   }
 
-  // gstack review F26: HTML must never be cached long — it's what points a
-  // repeat visitor at the *current* hashed asset filenames. Caching it would
-  // pin them to a stale bundle instead of a stale-but-safe empty shell.
-  res.status(200).set('Content-Type', 'text/html').set('Cache-Control', 'public, max-age=0, must-revalidate').send(html);
+  // gstack review F26, fixed independently on both branches — kept main's
+  // no-cache (not no-store): still cacheable, but every load revalidates
+  // against the ETag Express already attaches to res.send, so a repeat
+  // visitor gets a cheap 304 instead of skipping the request entirely,
+  // while still always seeing the current build. HTML must never be cached
+  // long regardless — it's what points a repeat visitor at the *current*
+  // hashed asset filenames.
+  res.status(200).set('Content-Type', 'text/html').set('Cache-Control', 'no-cache').send(html);
 }
 
 if (fs.existsSync(DIST_DIR)) {
   app.use(
     express.static(DIST_DIR, {
       index: false,
-      setHeaders: (res, filePath) => {
-        // gstack review F26: vite's build output hashes every filename
-        // under assets/ (content changes -> new filename), which is exactly
-        // what "immutable" means to a cache — the previous `max-age=0`
-        // forced a revalidation round-trip on every single asset, on every
-        // repeat visit, for files that can never change at that URL.
-        // Anything else under dist (favicon.svg, /brand/*.svg — copied from
-        // public/ as-is, not hashed) keeps the safe short-lived default.
-        if (filePath.startsWith(path.join(DIST_DIR, 'assets') + path.sep)) {
+      // gstack review F26, fixed independently on both branches — kept
+      // main's version. Only /assets/* filenames are content-hashed by the
+      // Vite build (index-<hash>.js/.css) — a change in content is
+      // guaranteed to be a change in URL, so these can be cached forever.
+      // Everything else under dist (favicon.svg, brand/*.svg,
+      // __prerendered__/*) keeps express.static's own default (effectively
+      // no caching), since those filenames don't change when their content
+      // does.
+      setHeaders(res, filePath) {
+        if (path.join(DIST_DIR, 'assets') === path.dirname(filePath)) {
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        } else {
-          res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
         }
       },
     })
@@ -1831,13 +1844,19 @@ if (fs.existsSync(DIST_DIR)) {
 
 app.get(['/', '/features', '/pricing', '/about', '/blog', '/security', '/compliance'], (req, res) => renderSeoPage(res, SEO_META[req.path]));
 
+// F4 was fixed independently on both branches — the /robots.txt and
+// /sitemap.xml handlers above (registered right after SEO_META) are the
+// surviving implementation; this branch's version disallows the
+// authenticated app routes specifically rather than a blanket `/api/`
+// only, which is the more precise crawl-budget signal.
+
 app.use('/api', (req, res) => sendError(res, 404, 'Not found'));
 
 app.get('*', (req, res) => {
   if (!fs.existsSync(DIST_INDEX)) {
     return res.status(200).send('Loadbyton API is running. Start the Vite dev server in web/ (npm run dev) or build it (npm run build) to serve the SPA from here.');
   }
-  res.set('Cache-Control', 'public, max-age=0, must-revalidate').sendFile(DIST_INDEX);
+  res.sendFile(DIST_INDEX, { headers: { 'Cache-Control': 'no-cache' } });
 });
 
 // eslint-disable-next-line no-unused-vars

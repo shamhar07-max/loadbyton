@@ -73,6 +73,8 @@ export default function Earnings() {
     .filter((p) => p.payout_status === 'RELEASED' && isThisCalendarMonth(p.released_at))
     .reduce((s, r) => s + r.net_aed, 0);
 
+  const releasedCount = payouts.filter((p) => p.payout_status === 'RELEASED').length;
+
   const releaseOptions = [
     { label: 'Release: All', value: 'all' },
     { label: 'Manual', value: 'MANUAL' },
@@ -107,7 +109,9 @@ export default function Earnings() {
         <Stat label="Paid out" value={formatAED(totals.paid)} tone="accent" />
         <Stat label="Pending" value={formatAED(totals.pending)} />
         <Stat label="Paid this month" value={formatAED(thisMonthPaid)} />
-        <Stat label="Avg per job" value={totals.paid > 0 ? formatAED(Math.round(totals.paid / (payouts.filter((p) => p.payout_status === 'RELEASED').length || 1))) : '—'} />
+        {/* F18, fixed independently on both branches — kept main's
+            precomputed releasedCount over this branch's inline filter. */}
+        <Stat label="Avg per job" value={releasedCount > 0 ? formatAED(Math.round(totals.paid / releasedCount)) : '—'} />
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
@@ -126,7 +130,7 @@ export default function Earnings() {
           <EmptyState icon={<IconPackage size={28} />} title="No payouts match these filters" description="Try a wider date range or release type." />
         ) : (
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto scroll-fade-x">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>

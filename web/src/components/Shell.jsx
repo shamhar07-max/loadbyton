@@ -102,7 +102,16 @@ export function Shell({ children }) {
           </button>
         </div>
       )}
-      <header className="sticky top-0 z-40 border-b bg-surface/95 backdrop-blur" style={{ borderColor: 'var(--border-default)' }}>
+      {/* bg-surface/95, not a plain Tailwind opacity modifier: --bg-surface is a
+          plain hex custom property, and Tailwind can't apply an alpha modifier
+          to that (it silently drops it, leaving the header fully transparent —
+          a real bug this replaced, where scrolled content showed straight
+          through the "sticky" header). color-mix() works with any custom
+          property, no token-format changes needed. */}
+      <header
+        className="sticky top-0 z-40 border-b backdrop-blur"
+        style={{ borderColor: 'var(--border-default)', backgroundColor: 'color-mix(in srgb, var(--bg-surface) 95%, transparent)' }}
+      >
         <div className="container-page flex h-16 items-center justify-between">
           <div className="flex items-center gap-8">
             <Logo />
@@ -133,7 +142,7 @@ export function Shell({ children }) {
             </button>
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="nav-link"
+              className="nav-link hidden md:inline-flex"
               aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
             >
@@ -195,12 +204,20 @@ export function Shell({ children }) {
               {(user ? navItems : [
                 { to: '/features', label: t('nav.features', 'Features') },
                 { to: '/pricing', label: t('nav.pricing', 'Pricing') },
-                { to: '/about', label: t('nav.about', 'About') }
+                { to: '/about', label: t('nav.about', 'About') },
+                { to: '/login', label: t('nav.login', 'Log in') },
               ]).map((item) => (
                 <NavLink key={item.to} to={item.to} className="nav-link" onClick={() => setMobileOpen(false)}>
                   {item.label}
                 </NavLink>
               ))}
+              <button
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="nav-link flex items-center gap-2 text-left"
+              >
+                {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
+                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              </button>
               <button
                 onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}
                 className="nav-link text-left"

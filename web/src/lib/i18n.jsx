@@ -31,9 +31,9 @@ const STRINGS = {
     'nav.features': 'Features',
     'nav.pricing': 'Pricing',
     'nav.about': 'About',
-    'landing.hero.title': 'The escrow-backed marketplace for UAE container drayage and road freight.',
+    'landing.hero.title': 'Stop running freight on WhatsApp and spreadsheets.',
     'landing.hero.subtitle':
-      'Post a shipment — a container move, a flatbed load, or a multi-truck volume job — and receive priced bids from carriers verified on trade licence, insurance, and TRN. Funds are held in escrow from award through delivery, released automatically once proof of delivery is confirmed or within 24 hours, whichever comes first.',
+      "Loadbyton is the UAE's escrow-backed freight operating system — post a job, get priced bids from verified carriers, and let escrow, tracking, and payouts run themselves. No broker calls. No chasing PODs. No surprise markups.",
     'landing.hero.ctaShipper': 'Post a load',
     'landing.hero.ctaCarrier': 'Bid as a carrier',
     'landing.hero.verified': 'Carriers verified on TRN, licence & insurance',
@@ -62,9 +62,9 @@ const STRINGS = {
     'nav.features': 'المزايا',
     'nav.pricing': 'الأسعار',
     'nav.about': 'من نحن',
-    'landing.hero.title': 'السوق الإلكتروني المدعوم بحساب الضمان لنقل الحاويات والشحن البري في دولة الإمارات.',
+    'landing.hero.title': 'توقف عن إدارة الشحن عبر واتساب وجداول البيانات.',
     'landing.hero.subtitle':
-      'انشر شحنة — نقل حاوية، حمولة على مسطحة، أو مهمة متعددة الشاحنات — واحصل على عروض أسعار من ناقلين تم التحقق من رخصتهم التجارية وتأمينهم ورقمهم الضريبي (TRN). تُحفظ الأموال في حساب الضمان من لحظة الترسية وحتى التسليم، وتُصرف تلقائيًا فور تأكيد إثبات التسليم أو خلال 24 ساعة، أيهما أسبق.',
+      'لودبايتون هو نظام تشغيل الشحن الإماراتي المدعوم بحساب الضمان — انشر مهمة، واحصل على عروض أسعار من ناقلين موثقين، ودع الضمان والتتبع والمدفوعات تسير تلقائيًا. بلا اتصالات وسطاء، بلا مطاردة إثباتات التسليم، وبلا رسوم مفاجئة.',
     'landing.hero.ctaShipper': 'انشر حمولة',
     'landing.hero.ctaCarrier': 'قدّم عرضًا كناقل',
     'landing.hero.verified': 'ناقلون تم التحقق من رخصتهم وتأمينهم ورقمهم الضريبي',
