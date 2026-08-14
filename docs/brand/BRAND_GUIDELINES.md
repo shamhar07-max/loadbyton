@@ -13,32 +13,27 @@ drift from them.
 
 ## 1. The mark
 
-> **Pending update.** The mark below predates the near-black + single-accent
-> system in §2. A new reference mark is being incorporated; once it lands,
-> this section gets rewritten to match — the mark's dominant fill needs to
-> coordinate with `--lb-ink-*` rather than stay orphaned on navy, per the
-> reserved-logo-accent discipline below (kept separate from `brand.accent` on
-> purpose either way).
-
-**Concept — "the container plate."** The mark is a navy, ribbed-panel tile with
+**Concept — "the container plate."** The mark is an ink, ribbed-panel tile with
 rounded corner rivets — a real container corner-casting, abstracted — carrying a
 white load pictogram at its centre, flanked by two thin **crimson bars**. Those
 bars are the mark's one fixed signature: the same two bars split the wordmark
-itself, between `LOAD`, `BY`, and `TON`, so the icon and the wordmark always read
-as one system. Unlike the previous mark, the tile is not a `currentColor` glyph —
-it's a fixed navy/white/crimson unit that looks the same on every surface, the way
-a physical plate riveted to a container would.
+itself, between `LOAD`, `BY`, and `TON` — with `BY` set as a stacked two-letter
+monogram (B over Y) between the bars, echoing the reference container-plate
+photograph the mark is built from — so the icon and the wordmark always read as
+one system. The tile is not a `currentColor` glyph — it's a fixed ink/white/
+crimson unit that looks the same on every surface, the way a physical plate
+riveted to a container would.
 
 - `web/public/brand/logo-mark.svg` — icon only, with the ribbed-panel texture and
   corner rivets at full detail. Used at nav scale (~28px) and anywhere the mark
   stands alone.
 - `web/public/brand/logo-full.svg` — full lockup (tile + wordmark) for light
-  surfaces; ink-navy `LOAD·BY·TON`, crimson divider bars.
+  surfaces; ink `LOAD · [B/Y] · TON`, crimson divider bars.
 - `web/public/brand/logo-full-on-dark.svg` — same lockup, paper-white wordmark and
   a slightly lifted crimson (`--lb-logo-accent-400`) for contrast, for the dark
-  navy surface (nav bar, footer, hero).
+  ink surface (nav bar, footer, hero).
 - `web/public/favicon.svg` — the tile simplified to its three load-bearing shapes
-  (navy ground, crimson bars, white pictogram) with the ribbing dropped — at
+  (ink ground, crimson bars, white pictogram) with the ribbing dropped — at
   16–32px browser-tab scale, texture reads as noise, not detail.
 
 **Clear space & minimum size.** Keep clear space around the tile equal to one
@@ -52,7 +47,7 @@ corner-rivet's diameter on every side. Never render the full-detail mark below
   means the two can never accidentally drift together).
 - Don't stretch, skew, or rotate the tile, and don't drop the rounded corners.
 - Don't place the light-wordmark lockup on anything lighter than `--lb-slate-200`,
-  or the dark-wordmark lockup on anything darker than `--lb-navy-800`.
+  or the dark-wordmark lockup on anything darker than `--lb-ink-800`.
 - Don't add a drop shadow, bevel, or outline beyond the tile's own 1px edge —
   the mark is otherwise flat by design.
 

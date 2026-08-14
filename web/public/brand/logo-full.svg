@@ -1,32 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 72" role="img" aria-label="Loadbyton">
-  <!-- Full lockup for light surfaces: the container-plate tile + navy
-       wordmark, "BY" set off from "LOAD" and "TON" by the same two crimson
-       bars used on the mark itself, so the tile and the wordmark read as
-       one system. -->
+  <!-- Full lockup for light surfaces: the container-plate tile + ink
+       wordmark, "BY" stacked and set off from "LOAD" and "TON" by the same
+       two crimson bars used on the mark itself, so the tile and the
+       wordmark read as one system. -->
   <defs>
     <clipPath id="lb-tile-56"><rect width="56" height="56" rx="12.25" /></clipPath>
   </defs>
   <g transform="translate(0,8)">
     <g clip-path="url(#lb-tile-56)">
-      <rect width="56" height="56" fill="#0F172A" />
-      <g stroke="#16213F" stroke-width="1.4" opacity="0.7">
+      <rect width="56" height="56" fill="#111113" />
+      <g stroke="#1C1C1F" stroke-width="1.4" opacity="0.7">
         <line x1="7" y1="0" x2="7" y2="56" />
         <line x1="16" y1="0" x2="16" y2="56" />
         <line x1="40" y1="0" x2="40" y2="56" />
         <line x1="49" y1="0" x2="49" y2="56" />
       </g>
     </g>
-    <rect x="1" y="1" width="54" height="54" rx="11.25" fill="none" stroke="#2B3B63" stroke-width="1" />
+    <rect x="1" y="1" width="54" height="54" rx="11.25" fill="none" stroke="#2A2A2E" stroke-width="1" />
     <rect x="16.5" y="14" width="2.6" height="28" rx="1.3" fill="#D6321F" />
     <rect x="36.9" y="14" width="2.6" height="28" rx="1.3" fill="#D6321F" />
     <rect x="23.5" y="20" width="9" height="16" rx="2.2" fill="#F8FAFC" />
   </g>
 
-  <g font-family="'Space Grotesk','Segoe UI',ui-sans-serif,sans-serif" font-weight="700" fill="#0F172A">
+  <g font-family="'Space Grotesk','Segoe UI',ui-sans-serif,sans-serif" font-weight="700" fill="#111113">
     <text x="76" y="46" font-size="32" letter-spacing="0.5">LOAD</text>
     <rect x="179" y="14" width="3" height="28" rx="1.5" fill="#D6321F" />
-    <text x="192" y="46" font-size="32" letter-spacing="0.5">BY</text>
-    <rect x="248" y="14" width="3" height="28" rx="1.5" fill="#D6321F" />
-    <text x="261" y="46" font-size="32" letter-spacing="0.5">TON</text>
+    <text x="200" y="30" font-size="18" text-anchor="middle" letter-spacing="0.5">B</text>
+    <text x="200" y="48" font-size="18" text-anchor="middle" letter-spacing="0.5">Y</text>
+    <rect x="216" y="14" width="3" height="28" rx="1.5" fill="#D6321F" />
+    <text x="229" y="46" font-size="32" letter-spacing="0.5">TON</text>
   </g>
 </svg>

@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Loadbyton">
   <!-- Simplified for browser-tab scale: no corrugation texture, just the
-       navy tile, the crimson bars, and the white load pictogram — the three
+       ink tile, the crimson bars, and the white load pictogram — the three
        shapes that still read correctly at 16px. -->
-  <rect width="64" height="64" rx="14" fill="#0F172A" />
+  <rect width="64" height="64" rx="14" fill="#111113" />
   <rect x="19" y="16" width="3" height="32" rx="1.5" fill="#D6321F" />
   <rect x="42" y="16" width="3" height="32" rx="1.5" fill="#D6321F" />
   <rect x="27" y="23" width="10" height="18" rx="2.5" fill="#F8FAFC" />
