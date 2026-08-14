@@ -617,6 +617,17 @@ function DocumentList({ documents, jobId, onAdd }) {
         </ul>
       )}
       <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
+        <details className="mb-3 text-xs text-ink-muted">
+          <summary className="cursor-pointer select-none font-medium text-ink-secondary">What should I upload?</summary>
+          <ul className="mt-2 space-y-1 pl-4" style={{ listStyle: 'disc' }}>
+            <li><strong>CUSTOMS</strong> — customs release/clearance paperwork for the container or cargo.</li>
+            <li><strong>RECEIPT</strong> — terminal handling receipt or any charge slip tied to this job.</li>
+            <li><strong>POD</strong> — proof of delivery (signed delivery note, gate pass) — usually attached automatically when you submit POD in the Actions panel.</li>
+            <li><strong>LICENCE</strong> — trade licence, used when a document needs to reference the carrier's registration.</li>
+            <li><strong>INSURANCE</strong> — cargo or fleet insurance certificate relevant to this shipment.</li>
+            <li><strong>OTHER</strong> — anything else worth keeping on the job record.</li>
+          </ul>
+        </details>
         <ScanWithAi
           label="Scan document to autofill title/type"
           fields={DOC_SCAN_FIELDS}

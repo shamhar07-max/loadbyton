@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { formatLabel, EQUIPMENT_TYPES, equipmentLabel } from '../lib/constants.js';
+import { EQUIPMENT_TYPES, equipmentLabel } from '../lib/constants.js';
 import { usePageTitle } from '../lib/seo.jsx';
 import { useLocale } from '../lib/i18n.jsx';
 import { Reveal } from '../components/Reveal.jsx';
+import FreightNetworkAnimation from '../components/FreightNetworkAnimation.jsx';
 import { IconShield, IconClock, IconArrowRight, IconStar, IconTruck, IconPackage, IconTrailer, IconLayers, IconCompass } from '../components/icons.jsx';
 
 const EQUIPMENT_ICONS = {
@@ -28,10 +29,8 @@ let skipHeroAnimOnce = typeof document !== 'undefined' && !!document.getElementB
 export default function Landing() {
   usePageTitle('');
   const { t } = useLocale();
-  const [lanes, setLanes] = useState([]);
   const [carriers, setCarriers] = useState([]);
   const [market, setMarket] = useState(null);
-  const [activeLane, setActiveLane] = useState(0);
   const [heroAnim] = useState(() => {
     if (skipHeroAnimOnce) {
       skipHeroAnimOnce = false;
@@ -41,26 +40,15 @@ export default function Landing() {
   });
 
   useEffect(() => {
-    api.publicLanes().then((d) => setLanes(d.lanes.slice(0, 5))).catch(() => {});
     api.publicCarriers().then((d) => setCarriers(d.carriers.slice(0, 4))).catch(() => {});
     api.publicMarket().then((d) => setMarket(d.market)).catch(() => {});
   }, []);
 
-  // Auto-advances the lane spotlight — paused implicitly whenever the user
-  // has already interacted (clicked a bar), since that just re-seeds this
-  // same interval rather than fighting it.
-  useEffect(() => {
-    if (!lanes.length) return;
-    const id = setInterval(() => setActiveLane((i) => (i + 1) % lanes.length), 3500);
-    return () => clearInterval(id);
-  }, [lanes.length]);
-
-  const spotlight = lanes[activeLane];
-  const maxLanePrice = Math.max(1, ...lanes.map((l) => l.basePriceAed));
-
   return (
     <div>
-      {/* Hero — split, not centered. Left: thesis. Right: a real component preview (the live lane index), not a stock photo. */}
+      {/* Hero — split, not centered. Left: thesis. Right: an animated network
+          visual (FreightNetworkAnimation) representing the platform's
+          coverage across the four emirates, not a stock photo. */}
       <section className="border-b" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page grid gap-12 py-16 lg:grid-cols-[1.05fr,0.95fr] lg:py-24">
           <div className="flex flex-col justify-center">
@@ -93,55 +81,15 @@ export default function Landing() {
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ background: 'var(--lb-orange-500)' }} />
                     <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: 'var(--lb-orange-500)' }} />
                   </span>
-                  Lane Index — live
+                  UAE freight network
                 </p>
-                <span className="badge" style={{ background: 'rgba(242,96,12,0.2)', color: 'var(--lb-orange-500)' }}>Public data</span>
+                <span className="badge" style={{ background: 'rgba(242,96,12,0.2)', color: 'var(--lb-orange-500)' }}>4 emirates</span>
               </div>
 
-              {/* Spotlight — one lane at a time, large type, auto-rotating.
-                  A price list of five identical rows was flat; a single
-                  focal lane that changes reads as alive without inventing
-                  data that isn't real. */}
-              <div className="px-5 py-6">
-                {spotlight ? (
-                  <div key={activeLane} className="animate-panel-in">
-                    <p className="truncate font-display text-lg font-semibold text-white">
-                      {formatLabel(spotlight.terminal)} <span style={{ color: 'rgba(255,255,255,0.4)' }}>→</span> {formatLabel(spotlight.area)}
-                    </p>
-                    <div className="mt-3 flex items-end justify-between">
-                      <p className="tabular font-display text-3xl font-bold" style={{ color: 'var(--lb-orange-500)' }}>AED {spotlight.basePriceAed}</p>
-                      <div className="text-right">
-                        <p className="tabular text-sm font-semibold text-white">{spotlight.onTimePct}% on-time</p>
-                        <p className="tabular text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{spotlight.distanceKm} km</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>Loading…</p>
-                )}
-
-                {/* Mini comparison bars — click to jump the spotlight; this is
-                    the same five lanes as one glance-able chart instead of a
-                    repeated list. */}
-                <div className="mt-5 space-y-1.5">
-                  {lanes.map((lane, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setActiveLane(i)}
-                      className="group flex w-full items-center gap-2 rounded-md py-0.5 text-left transition-opacity"
-                      style={{ opacity: i === activeLane ? 1 : 0.55 }}
-                      aria-label={`Show ${formatLabel(lane.terminal)} to ${formatLabel(lane.area)}`}
-                    >
-                      <span className="w-16 shrink-0 truncate text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{formatLabel(lane.terminal)}</span>
-                      <span className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                        <span
-                          className="block h-full rounded-full transition-all duration-500 group-hover:opacity-90"
-                          style={{ width: `${Math.max(8, (lane.basePriceAed / maxLanePrice) * 100)}%`, background: i === activeLane ? 'var(--lb-orange-500)' : 'rgba(255,255,255,0.35)' }}
-                        />
-                      </span>
-                    </button>
-                  ))}
-                </div>
+              {/* Hub-and-spoke network visual — see FreightNetworkAnimation.jsx
+                  for why this is the "poster" here instead of a literal map. */}
+              <div className="px-5 pb-2 pt-4">
+                <FreightNetworkAnimation />
               </div>
 
               <div className="grid grid-cols-3 gap-px px-5 py-4" style={{ background: 'rgba(255,255,255,0.06)' }}>

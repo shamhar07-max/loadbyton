@@ -208,7 +208,7 @@ The strategy doc (`docs/STRATEGY.md`) identifies "one-and-done" as the killer; t
 - **lib/seo.jsx**: `usePageTitle`/`useMeta` set `document.title` and meta tags per route.
 - **components/Shell.jsx**: layout chrome — top nav (role-aware links + user menu + logout), footer.
 - **components/ui.jsx**: the design-system kit — `Button` (primary/secondary/ghost/danger/outline), `Card` (+Header/Title/Content/Footer), `Badge` (color variants), `Input`, `Textarea`, `Select`, `Label`, `Spinner`, `EmptyState`, `Stat`.
-- **Design tokens**: Tailwind config + `index.css` define primitives (primary `#1e40af`, secondary `#3b82f6`, card surface, dark background `#0a0e17`) with `[data-theme="dark"]`/`[data-theme="light"]` overrides. Typography: **Inter** (body) + **Space Grotesk** (display) via Google Fonts. Component classes: `.card`, `.btn-primary`, `.btn-secondary`, `.nav`, `.section`, `.container`, `.grid-responsive`, `.prose`.
+- **Design tokens**: Tailwind config + `index.css` define primitives (primary `#1e40af`, secondary `#3b82f6`, card surface, dark background `#0a0e17`) with `[data-theme="dark"]`/`[data-theme="light"]` overrides. Typography: **Inter** (body) + **Manrope** (display) via Google Fonts. Component classes: `.card`, `.btn-primary`, `.btn-secondary`, `.nav`, `.section`, `.container`, `.grid-responsive`, `.prose`.
 
 ---
 

@@ -188,14 +188,14 @@ body {
 }
 
 h1, h2, h3, h4, .font-display {
-  font-family: 'Space Grotesk', ui-sans-serif, sans-serif;
+  font-family: 'Manrope', ui-sans-serif, sans-serif;
 }
 
-/* Arabic locale: Space Grotesk/Inter have no Arabic glyphs, so without
-   this the whole app would silently fall back to the browser's unstyled
-   default font the moment dir="rtl" is set (see lib/i18n.jsx). Noto Sans
-   Arabic covers both display and body weight, keeping Arabic text
-   intentional rather than a fallback accident. */
+/* Arabic locale: Manrope/Inter have no Arabic glyphs, so without this the
+   whole app would silently fall back to the browser's unstyled default
+   font the moment dir="rtl" is set (see lib/i18n.jsx). Noto Sans Arabic
+   covers both display and body weight, keeping Arabic text intentional
+   rather than a fallback accident. */
 html[lang="ar"] body,
 html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, html[lang="ar"] .font-display {
   font-family: 'Noto Sans Arabic', 'Inter', ui-sans-serif, sans-serif;
@@ -289,6 +289,81 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
 }
 .animate-marquee:hover {
   animation-play-state: paused;
+}
+
+/* Hero network visual (components/FreightNetworkAnimation.jsx) — replaces
+   the old "Lane Index — live" widget. offset-path/offset-distance moves the
+   packet dot along each hub→node line without any JS; stroke-dashoffset
+   gives the lines a "flowing" look. All keyframe-driven, so the global
+   prefers-reduced-motion block above collapses every one of these to a
+   single static frame for free. */
+.freight-net { width: 100%; }
+.freight-net-svg { display: block; width: 100%; height: auto; }
+
+.freight-net-line {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 5;
+  animation: freight-net-flow 1.8s linear infinite;
+}
+@keyframes freight-net-flow {
+  to { stroke-dashoffset: -18; }
+}
+
+.freight-net-packet {
+  fill: var(--lb-orange-500);
+  offset-distance: 0%;
+  filter: drop-shadow(0 0 4px rgba(255, 122, 51, 0.7));
+  animation: freight-net-packet-move 3.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes freight-net-packet-move {
+  0% { offset-distance: 0%; opacity: 0; }
+  8% { opacity: 1; }
+  46% { offset-distance: 100%; opacity: 1; }
+  50%, 100% { offset-distance: 100%; opacity: 0; }
+}
+
+.freight-net-hub {
+  fill: var(--lb-orange-500);
+}
+.freight-net-hub-ring {
+  fill: none;
+  stroke: var(--lb-orange-500);
+  stroke-width: 1.5;
+  opacity: 0.5;
+  transform-origin: 200px 162px;
+  animation: freight-net-ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes freight-net-ping {
+  0% { transform: scale(1); opacity: 0.6; }
+  75%, 100% { transform: scale(1.9); opacity: 0; }
+}
+
+.freight-net-node {
+  opacity: 0;
+  animation: freight-net-node-in 0.5s ease-out forwards;
+}
+@keyframes freight-net-node-in {
+  to { opacity: 1; }
+}
+.freight-net-node-dot {
+  fill: #ffffff;
+}
+.freight-net-node-ring {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1.2;
+  animation: freight-net-node-pulse 2.6s ease-in-out infinite;
+}
+@keyframes freight-net-node-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+}
+.freight-net-label {
+  fill: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  font-family: var(--lb-font-body);
 }
 
 /* ------------------------------------------------------------------ */
