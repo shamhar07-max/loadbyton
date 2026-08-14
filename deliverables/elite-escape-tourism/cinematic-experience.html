@@ -1,0 +1,910 @@
+<title>Elite Escape Reborn</title>
+<style>
+  :root{
+    --ink:#0d1330;
+    --navy:#152363;
+    --navy-2:#1c2f82;
+    --blue:#2f5fe0;
+    --cyan:#3fd0f0;
+    --cyan-soft:#9fe8f7;
+    --paper:#f4f7fc;
+    --paper-2:#e8edf8;
+    --mist:#5c6688;
+    --mist-2:#8992ad;
+    --card:#ffffff;
+    --card-line:#dbe2f0;
+    --on-dark:#f2f5ff;
+    --on-dark-mist:#a7b0d6;
+    --danger:#ff6b57;
+    --ok:#38d39f;
+    --serif-fallback: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
+
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--serif-fallback);
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  img,svg{display:block;max-width:100%;}
+
+  .measure{max-width:62ch;}
+
+  h1,h2,h3{
+    font-weight:800;
+    letter-spacing:-0.02em;
+    text-wrap:balance;
+    margin:0;
+  }
+
+  .eyebrow{
+    font-size:0.72rem;
+    font-weight:700;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--cyan);
+    margin:0 0 0.9em;
+    display:flex;
+    align-items:center;
+    gap:0.6em;
+  }
+  .eyebrow::before{
+    content:"";
+    width:1.6em;
+    height:1px;
+    background:currentColor;
+    opacity:0.6;
+  }
+  .eyebrow.on-light{ color:var(--blue); }
+
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:0 clamp(1.25rem, 4vw, 3rem);
+  }
+
+  /* ---------- orbit scroll-track ---------- */
+  #orbit-track{
+    position:fixed;
+    top:0; left:0;
+    width:3px;
+    height:100vh;
+    z-index:40;
+    pointer-events:none;
+    mix-blend-mode:normal;
+  }
+  #orbit-track .rail{
+    position:absolute; inset:0;
+    background:linear-gradient(180deg, transparent, rgba(63,208,240,0.35) 15%, rgba(63,208,240,0.35) 85%, transparent);
+  }
+  #orbit-track .dot{
+    position:absolute;
+    left:-4.5px;
+    top:0;
+    width:12px; height:12px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #cdf6ff, var(--cyan) 55%, var(--blue) 100%);
+    box-shadow:0 0 14px 3px rgba(63,208,240,0.65);
+    transform:translateY(0);
+    will-change:transform;
+  }
+
+  /* ---------- top nav ---------- */
+  .nav{
+    position:fixed; top:0; left:0; right:0;
+    z-index:50;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:1.1rem clamp(1.25rem, 4vw, 3rem);
+    background:rgba(9,13,35,0.72);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid rgba(255,255,255,0.06);
+    opacity:0;
+    transform:translateY(-8px);
+    transition:opacity 0.6s ease, transform 0.6s ease;
+    pointer-events:none;
+  }
+  .nav.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
+  .nav .mark{ display:flex; align-items:center; gap:0.6rem; }
+  .nav .mark span{
+    font-weight:800; font-size:0.85rem; letter-spacing:0.08em;
+    color:var(--on-dark);
+  }
+  .nav a.cta{
+    font-size:0.78rem; font-weight:700; letter-spacing:0.04em;
+    color:var(--ink);
+    background:linear-gradient(120deg, var(--cyan-soft), var(--cyan));
+    padding:0.6em 1.15em;
+    border-radius:100px;
+    text-decoration:none;
+    box-shadow:0 6px 20px rgba(63,208,240,0.35);
+  }
+
+  /* ---------- reveal ---------- */
+  .reveal{
+    opacity:0;
+    transform:translateY(28px);
+    transition:opacity 0.9s cubic-bezier(.16,.8,.24,1), transform 0.9s cubic-bezier(.16,.8,.24,1);
+  }
+  .reveal.in{ opacity:1; transform:translateY(0); }
+  .reveal.d1{ transition-delay:0.08s; }
+  .reveal.d2{ transition-delay:0.16s; }
+  .reveal.d3{ transition-delay:0.24s; }
+  .reveal.d4{ transition-delay:0.32s; }
+  @media (prefers-reduced-motion: reduce){
+    .reveal{ transition:none; opacity:1; transform:none; }
+  }
+
+  /* ================= HERO ================= */
+  #hero{
+    position:relative;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    background:
+      radial-gradient(60% 55% at 50% 8%, rgba(47,95,224,0.35), transparent 60%),
+      radial-gradient(90% 70% at 80% 100%, rgba(63,208,240,0.16), transparent 60%),
+      linear-gradient(180deg, var(--ink) 0%, var(--navy) 55%, #0a0f28 100%);
+    color:var(--on-dark);
+    padding:7rem 1.5rem 5rem;
+    overflow:hidden;
+  }
+  #hero .field{
+    position:absolute; inset:0;
+    background-image:
+      radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.5px 1.5px at 75% 20%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,0.35), transparent),
+      radial-gradient(1.5px 1.5px at 35% 80%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 90% 60%, rgba(255,255,255,0.35), transparent),
+      radial-gradient(1.5px 1.5px at 10% 60%, rgba(255,255,255,0.3), transparent);
+    opacity:0.7;
+  }
+  #hero .orbit-mark{ width:min(30vw, 220px); margin:0 auto 2.2rem; position:relative; z-index:2; }
+  #hero .orbit-mark path.ring{
+    stroke-dasharray:760;
+    stroke-dashoffset:760;
+    animation:draw 2.1s cubic-bezier(.2,.7,.2,1) 0.2s forwards;
+  }
+  #hero .orbit-mark path.ring.ring2{
+    stroke-dasharray:760;
+    stroke-dashoffset:-760;
+    animation:draw2 2.1s cubic-bezier(.2,.7,.2,1) 0.2s forwards;
+  }
+  #hero .orbit-mark .dart{
+    opacity:0;
+    animation:pop 0.5s ease 1.9s forwards;
+    transform-origin:center;
+  }
+  @keyframes draw{ to{ stroke-dashoffset:0; } }
+  @keyframes draw2{ to{ stroke-dashoffset:0; } }
+  @keyframes pop{ from{opacity:0; transform:scale(0.4);} to{opacity:1; transform:scale(1);} }
+  @media (prefers-reduced-motion: reduce){
+    #hero .orbit-mark path.ring, #hero .orbit-mark path.ring.ring2{ animation:none; stroke-dashoffset:0; }
+    #hero .orbit-mark .dart{ animation:none; opacity:1; }
+  }
+
+  #hero .kicker{
+    position:relative; z-index:2;
+    font-size:0.78rem; font-weight:700; letter-spacing:0.3em; text-transform:uppercase;
+    color:var(--cyan-soft);
+    margin-bottom:1.4rem;
+    opacity:0;
+    animation:fadeUp 0.8s ease 0.5s forwards;
+  }
+  #hero h1{
+    position:relative; z-index:2;
+    font-size:clamp(1.9rem, 4.4vw, 3.6rem);
+    line-height:1.12;
+    max-width:23ch;
+    margin:0 auto;
+    opacity:0;
+    animation:fadeUp 0.9s ease 0.7s forwards;
+  }
+  #hero h1 em{
+    font-style:normal;
+    background:linear-gradient(100deg, var(--cyan-soft), var(--cyan) 55%, #7fa6ff);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  #hero .sub{
+    position:relative; z-index:2;
+    margin:1.6rem auto 0;
+    max-width:46ch;
+    font-size:clamp(1rem, 1.6vw, 1.15rem);
+    color:var(--on-dark-mist);
+    opacity:0;
+    animation:fadeUp 0.9s ease 0.95s forwards;
+  }
+  #hero .domain{
+    color:var(--on-dark);
+    font-weight:700;
+    border-bottom:1px solid rgba(255,255,255,0.25);
+  }
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(16px);} to{opacity:1; transform:translateY(0);} }
+  @media (prefers-reduced-motion: reduce){
+    #hero .kicker, #hero h1, #hero .sub{ animation:none; opacity:1; transform:none; }
+  }
+
+  #hero .scrollcue{
+    position:relative; z-index:2;
+    margin-top:3.6rem;
+    display:flex; flex-direction:column; align-items:center; gap:0.5rem;
+    color:var(--on-dark-mist);
+    font-size:0.72rem; letter-spacing:0.18em; text-transform:uppercase;
+    opacity:0;
+    animation:fadeUp 0.9s ease 1.2s forwards;
+  }
+  #hero .scrollcue .line{
+    width:1px; height:34px;
+    background:linear-gradient(180deg, var(--cyan), transparent);
+    animation:cue 1.8s ease-in-out infinite;
+  }
+  @keyframes cue{ 0%,100%{transform:scaleY(1); opacity:0.5;} 50%{transform:scaleY(1.3); opacity:1;} }
+  @media (prefers-reduced-motion: reduce){
+    #hero .scrollcue{ animation:none; opacity:1; }
+    #hero .scrollcue .line{ animation:none; }
+  }
+
+  /* ================= EXHIBIT ================= */
+  #exhibit{
+    background:#0a0f28;
+    color:var(--on-dark);
+    padding:clamp(4.5rem,9vw,7rem) 0;
+    position:relative;
+  }
+  #exhibit .grid-lines{
+    position:absolute; inset:0;
+    background-image:linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size:42px 42px;
+    mask-image:radial-gradient(ellipse at 50% 0%, black, transparent 75%);
+    pointer-events:none;
+  }
+  #exhibit .head{ position:relative; text-align:center; max-width:44ch; margin:0 auto 3rem; }
+  #exhibit h2{ font-size:clamp(1.7rem, 3.4vw, 2.5rem); color:var(--on-dark); }
+  #exhibit .head p{ color:var(--on-dark-mist); margin-top:1rem; font-size:1.02rem; line-height:1.6; }
+
+  .term{
+    position:relative;
+    background:#0f1638;
+    border:1px solid rgba(255,255,255,0.09);
+    border-radius:14px;
+    max-width:840px;
+    margin:0 auto;
+    box-shadow:0 30px 70px -20px rgba(0,0,0,0.6);
+    overflow:hidden;
+  }
+  .term .bar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0.7rem 1rem;
+    background:#0b1230;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .term .dots{ display:flex; gap:6px; }
+  .term .dots i{ width:9px; height:9px; border-radius:50%; background:rgba(255,255,255,0.18); display:block; }
+  .term .live{
+    display:flex; align-items:center; gap:0.45rem;
+    font-size:0.68rem; letter-spacing:0.14em; font-weight:700; color:var(--danger);
+  }
+  .term .live .pulse{
+    width:7px; height:7px; border-radius:50%; background:var(--danger);
+    box-shadow:0 0 0 0 rgba(255,107,87,0.6);
+    animation:pulse 1.6s infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 0 rgba(255,107,87,0.55); }
+    70%{ box-shadow:0 0 0 9px rgba(255,107,87,0); }
+    100%{ box-shadow:0 0 0 0 rgba(255,107,87,0); }
+  }
+  .term .rows{ padding:0.4rem 0; }
+  .term .row{
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    gap:1rem;
+    align-items:baseline;
+    padding:0.85rem 1.25rem;
+    font-family:ui-monospace,"SF Mono",Consolas,"Liberation Mono",monospace;
+    font-size:0.82rem;
+    border-top:1px solid rgba(255,255,255,0.055);
+  }
+  .term .row:first-child{ border-top:none; }
+  .term .row .verb{ color:var(--cyan-soft); font-weight:700; }
+  .term .row .path{ color:var(--on-dark); word-break:break-all; }
+  .term .row .path .dim{ color:var(--on-dark-mist); }
+  .term .row .tag{
+    font-size:0.68rem; letter-spacing:0.05em; color:var(--on-dark-mist);
+    text-align:right; white-space:nowrap;
+  }
+  .term .foot{
+    padding:1rem 1.25rem 1.25rem;
+    font-family:var(--serif-fallback);
+    font-size:0.88rem;
+    color:var(--on-dark-mist);
+    border-top:1px solid rgba(255,255,255,0.08);
+  }
+  .term .foot b{ color:var(--on-dark); }
+
+  /* ================= VISION ================= */
+  #vision{
+    background:var(--paper);
+    padding:clamp(4.5rem,9vw,7rem) 0;
+  }
+  .split{
+    display:grid;
+    grid-template-columns:1.05fr 0.95fr;
+    gap:clamp(2rem,5vw,4.5rem);
+    align-items:center;
+  }
+  @media (max-width:860px){ .split{ grid-template-columns:1fr; } }
+
+  #vision h2{ font-size:clamp(1.8rem,3.6vw,2.7rem); color:var(--ink); max-width:14ch; }
+  #vision .lede{ color:var(--mist); margin-top:1rem; font-size:1.05rem; max-width:42ch; }
+
+  .checklist{ list-style:none; margin:2.2rem 0 0; padding:0; display:flex; flex-direction:column; gap:1.15rem; }
+  .checklist li{ display:flex; gap:0.9rem; align-items:flex-start; }
+  .checklist .tick{
+    flex:none; width:22px; height:22px; border-radius:50%;
+    background:linear-gradient(135deg, var(--blue), var(--cyan));
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 4px 14px rgba(47,95,224,0.35);
+    margin-top:0.15rem;
+  }
+  .checklist .tick svg{ width:11px; height:11px; }
+  .checklist .txt b{ display:block; color:var(--ink); font-size:0.98rem; }
+  .checklist .txt span{ color:var(--mist); font-size:0.9rem; }
+
+  .stat-row{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem;
+    margin-top:2.6rem;
+  }
+  @media (max-width:560px){ .stat-row{ grid-template-columns:1fr; } }
+  .stat{
+    background:var(--card);
+    border:1px solid var(--card-line);
+    border-radius:16px;
+    padding:1.25rem 1.1rem;
+  }
+  .stat .num{
+    font-size:1.9rem; font-weight:800; letter-spacing:-0.02em;
+    background:linear-gradient(120deg, var(--navy-2), var(--blue));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    font-variant-numeric:tabular-nums;
+  }
+  .stat .lbl{ font-size:0.78rem; color:var(--mist); margin-top:0.3rem; }
+
+  .phone{
+    position:relative;
+    background:linear-gradient(160deg, #101a44, #0a1230);
+    border-radius:28px;
+    padding:1.6rem 1.4rem;
+    box-shadow:0 40px 80px -30px rgba(16,26,68,0.55);
+    max-width:380px;
+    margin:0 auto;
+  }
+  .phone .ph-head{
+    display:flex; align-items:center; gap:0.6rem;
+    color:var(--on-dark); font-size:0.85rem; font-weight:700;
+    padding-bottom:0.9rem; margin-bottom:0.9rem;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .phone .ph-head .av{
+    width:30px; height:30px; border-radius:50%;
+    background:linear-gradient(135deg, var(--cyan), var(--blue));
+  }
+  .phone .ph-head small{ display:block; font-weight:500; color:var(--on-dark-mist); font-size:0.72rem; }
+  .bubble{
+    max-width:82%;
+    padding:0.65rem 0.9rem;
+    border-radius:14px;
+    font-size:0.85rem;
+    line-height:1.4;
+    margin-bottom:0.6rem;
+  }
+  .bubble.in{ background:rgba(255,255,255,0.08); color:var(--on-dark); border-bottom-left-radius:4px; }
+  .bubble.out{
+    background:linear-gradient(120deg, var(--blue), var(--cyan));
+    color:#071022; margin-left:auto; border-bottom-right-radius:4px; font-weight:600;
+  }
+  .typing{
+    display:inline-flex; gap:4px; padding:0.65rem 0.9rem;
+    background:rgba(255,255,255,0.08); border-radius:14px; border-bottom-left-radius:4px;
+  }
+  .typing span{
+    width:6px; height:6px; border-radius:50%; background:var(--cyan-soft);
+    animation:bounce 1.2s infinite ease-in-out;
+  }
+  .typing span:nth-child(2){ animation-delay:0.15s; }
+  .typing span:nth-child(3){ animation-delay:0.3s; }
+  @keyframes bounce{ 0%,60%,100%{ transform:translateY(0); opacity:0.5; } 30%{ transform:translateY(-4px); opacity:1; } }
+  .phone .badge{
+    position:absolute; top:-14px; right:22px;
+    background:var(--ok); color:#05231a; font-weight:800; font-size:0.68rem;
+    letter-spacing:0.05em; padding:0.4em 0.8em; border-radius:100px;
+    box-shadow:0 8px 20px rgba(56,211,159,0.4);
+  }
+
+  /* ================= REBUILD ================= */
+  #rebuild{ background:var(--paper-2); padding:clamp(4.5rem,9vw,7rem) 0; }
+  #rebuild .head{ max-width:52ch; margin-bottom:3.2rem; }
+  #rebuild h2{ font-size:clamp(1.8rem,3.6vw,2.7rem); color:var(--ink); }
+  #rebuild .head p{ color:var(--mist); margin-top:1rem; font-size:1.05rem; }
+
+  .compare{ display:flex; flex-direction:column; gap:1rem; }
+  .cmp-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    background:var(--card);
+    border:1px solid var(--card-line);
+    border-radius:18px;
+    overflow:hidden;
+  }
+  @media (max-width:760px){ .cmp-row{ grid-template-columns:1fr; } }
+  .cmp-row.from-left{ transform:translateX(-16px); }
+  .cmp-row.from-right{ transform:translateX(16px); }
+  .cmp-row.reveal.in{ transform:translateX(0); }
+
+  .cmp-half{ padding:1.6rem 1.7rem; }
+  .cmp-half.before{ background:#f6f2ee; }
+  .cmp-half.after{ background:linear-gradient(165deg, #0f1a45, #0a1230); color:var(--on-dark); }
+  .cmp-tag{
+    font-size:0.66rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase;
+    margin-bottom:0.6rem; display:inline-block;
+  }
+  .cmp-half.before .cmp-tag{ color:#a3897a; }
+  .cmp-half.after .cmp-tag{ color:var(--cyan-soft); }
+  .cmp-half h4{ margin:0 0 0.4rem; font-size:1.02rem; font-weight:700; }
+  .cmp-half.before h4{ color:#5c5049; }
+  .cmp-half.after h4{ color:var(--on-dark); }
+  .cmp-half p{ margin:0; font-size:0.9rem; line-height:1.55; }
+  .cmp-half.before p{ color:#7a6d64; }
+  .cmp-half.after p{ color:var(--on-dark-mist); }
+
+  /* ================= PROOF ================= */
+  #proof{ background:#0a0f28; color:var(--on-dark); padding:clamp(4.5rem,9vw,7rem) 0; }
+  #proof .head{ text-align:center; max-width:44ch; margin:0 auto 3rem; }
+  #proof h2{ font-size:clamp(1.8rem,3.6vw,2.7rem); color:var(--on-dark); }
+  #proof .head p{ color:var(--on-dark-mist); margin-top:1rem; }
+
+  .kpi-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1.4rem; }
+  @media (max-width:820px){ .kpi-grid{ grid-template-columns:1fr; } }
+  .kpi{
+    background:linear-gradient(165deg, #10193f, #0b1230);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:20px;
+    padding:1.8rem 1.7rem;
+    box-shadow:0 24px 50px -24px rgba(0,0,0,0.6);
+  }
+  .kpi .lbl{ color:var(--on-dark-mist); font-size:0.85rem; font-weight:600; }
+  .kpi .val{
+    margin-top:0.6rem;
+    font-size:2.3rem; font-weight:800; letter-spacing:-0.02em;
+    font-variant-numeric:tabular-nums;
+  }
+  .kpi .val .arrow{ color:var(--cyan); font-weight:700; }
+  .kpi .bar{
+    margin-top:1.1rem; height:6px; border-radius:100px;
+    background:rgba(255,255,255,0.08); overflow:hidden;
+  }
+  .kpi .bar i{
+    display:block; height:100%; width:var(--w,0%);
+    background:linear-gradient(90deg, var(--blue), var(--cyan));
+    border-radius:100px;
+    transition:width 1.4s cubic-bezier(.2,.7,.2,1);
+  }
+  .kpi .target{ margin-top:0.7rem; font-size:0.72rem; color:var(--on-dark-mist); letter-spacing:0.03em; }
+
+  /* ================= OFFER ================= */
+  #offer{ background:linear-gradient(180deg, #0a0f28, var(--ink)); color:var(--on-dark); padding:clamp(4.5rem,9vw,7rem) 0 5rem; }
+  #offer .head{ text-align:center; max-width:50ch; margin:0 auto 3.2rem; }
+  #offer h2{ font-size:clamp(1.9rem,3.8vw,2.9rem); color:var(--on-dark); }
+  #offer .head p{ color:var(--on-dark-mist); margin-top:1rem; font-size:1.05rem; }
+
+  .tiers{ display:grid; grid-template-columns:repeat(3,1fr); gap:1.3rem; align-items:stretch; }
+  @media (max-width:860px){ .tiers{ grid-template-columns:1fr; } }
+  .tier{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.09);
+    border-radius:20px;
+    padding:1.8rem 1.6rem;
+    display:flex; flex-direction:column;
+  }
+  .tier.hi{
+    background:linear-gradient(165deg, rgba(47,95,224,0.28), rgba(63,208,240,0.16));
+    border-color:rgba(63,208,240,0.4);
+    transform:translateY(-10px);
+    box-shadow:0 30px 60px -24px rgba(47,95,224,0.5);
+  }
+  @media (max-width:860px){ .tier.hi{ transform:none; } }
+  .tier .tname{ font-weight:800; font-size:1.05rem; }
+  .tier .tprice{ font-size:0.85rem; color:var(--cyan-soft); margin-top:0.3rem; font-weight:700; }
+  .tier ul{ list-style:none; margin:1.3rem 0 0; padding:0; display:flex; flex-direction:column; gap:0.65rem; flex:1; }
+  .tier li{ font-size:0.86rem; color:var(--on-dark-mist); padding-left:1.1rem; position:relative; }
+  .tier li::before{ content:"—"; position:absolute; left:0; color:var(--cyan); }
+
+  .cta-block{ text-align:center; margin-top:3.6rem; }
+  .cta-btn{
+    display:inline-flex; align-items:center; gap:0.6rem;
+    background:linear-gradient(120deg, var(--cyan-soft), var(--cyan) 60%, var(--blue));
+    color:#071022;
+    font-weight:800; font-size:1rem;
+    padding:1em 2em;
+    border-radius:100px;
+    text-decoration:none;
+    box-shadow:0 20px 50px -10px rgba(63,208,240,0.55);
+    transition:transform 0.35s cubic-bezier(.2,.8,.2,1), box-shadow 0.35s ease;
+  }
+  .cta-btn:hover{ transform:translateY(-3px) scale(1.02); box-shadow:0 26px 60px -8px rgba(63,208,240,0.7); }
+  .cta-sub{ margin-top:1.1rem; color:var(--on-dark-mist); font-size:0.85rem; }
+  .cta-sub a{ color:var(--on-dark); text-decoration:none; border-bottom:1px solid rgba(255,255,255,0.3); }
+
+  /* ================= FOOTER ================= */
+  footer{
+    background:var(--ink); color:var(--on-dark-mist);
+    padding:2.6rem 0 2.2rem; font-size:0.82rem;
+  }
+  footer .fwrap{
+    display:flex; flex-wrap:wrap; gap:1.2rem;
+    align-items:center; justify-content:space-between;
+    border-top:1px solid rgba(255,255,255,0.08);
+    padding-top:1.6rem;
+  }
+  footer .fmark{ display:flex; align-items:center; gap:0.6rem; color:var(--on-dark); font-weight:700; }
+  footer .fmeta{ display:flex; flex-wrap:wrap; gap:1.4rem; }
+  footer .fmeta a{ color:var(--on-dark-mist); text-decoration:none; }
+  footer .fmeta a:hover{ color:var(--on-dark); }
+</style>
+
+<div id="orbit-track"><div class="rail"></div><div class="dot" id="orbit-dot"></div></div>
+
+<nav class="nav" id="nav">
+  <div class="mark">
+    <svg width="26" height="26" viewBox="0 0 100 100" aria-hidden="true">
+      <defs><linearGradient id="navg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#173a8f"/><stop offset="1" stop-color="#3fd0f0"/>
+      </linearGradient></defs>
+      <path d="M50 12 A38 38 0 1 1 15 62" fill="none" stroke="url(#navg)" stroke-width="11" stroke-linecap="round"/>
+      <path d="M18 66 L34 58 L28 74 Z" fill="#3fd0f0"/>
+    </svg>
+    <span>ELITE ESCAPE TOURISM</span>
+  </div>
+  <a class="cta" href="#offer">Book the audit</a>
+</nav>
+
+<section id="hero">
+  <div class="field"></div>
+  <p class="kicker">A DigitalBurj Transformation Proposal</p>
+
+  <svg class="orbit-mark" viewBox="0 0 200 200" aria-label="Elite Escape orbit mark">
+    <defs>
+      <linearGradient id="ringA" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#173a8f"/>
+        <stop offset="1" stop-color="#3fd0f0"/>
+      </linearGradient>
+      <linearGradient id="ringB" x1="1" y1="1" x2="0" y2="0">
+        <stop offset="0" stop-color="#3fd0f0"/>
+        <stop offset="1" stop-color="#7fa6ff"/>
+      </linearGradient>
+    </defs>
+    <path class="ring" d="M100 24 A76 76 0 1 1 32 118" fill="none" stroke="url(#ringA)" stroke-width="16" stroke-linecap="round"/>
+    <path class="ring ring2" d="M100 24 A76 76 0 0 0 30 84" fill="none" stroke="url(#ringB)" stroke-width="16" stroke-linecap="round" opacity="0.001"/>
+    <polygon class="dart" points="30,96 62,80 46,124" fill="#3fd0f0"/>
+  </svg>
+
+  <h1>Elite Escape Tourism is live. <em>So is the malware</em> selling golf clubs on your domain.</h1>
+  <p class="sub">A cinematic look at what's actually indexed on <span class="domain">eliteescapetourism.com</span> right now — and the rebuild waiting on the other side of it.</p>
+
+  <div class="scrollcue"><span>Scroll</span><span class="line"></span></div>
+</section>
+
+<section id="exhibit">
+  <div class="grid-lines"></div>
+  <div class="wrap">
+    <div class="head reveal">
+      <p class="eyebrow" style="justify-content:center;">Exhibit A — found in the wild, August 2026</p>
+      <h2>This is what Google indexes today.</h2>
+      <p>Five live routes on your own domain, none of them yours, all still resolving. This is the actual search footprint of eliteescapetourism.com right now.</p>
+    </div>
+
+    <div class="term reveal">
+      <div class="bar">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="live"><span class="pulse"></span>LIVE ON YOUR DOMAIN</div>
+      </div>
+      <div class="rows">
+        <div class="row">
+          <span class="verb">GET</span>
+          <span class="path">eliteescapetourism.com<span class="dim">/goods.php?items/J87408852/</span></span>
+          <span class="tag">JP resale · loop pedal</span>
+        </div>
+        <div class="row">
+          <span class="verb">GET</span>
+          <span class="path">eliteescapetourism.com<span class="dim">/goods.php?items/T278471438/</span></span>
+          <span class="tag">JP resale · women's jacket</span>
+        </div>
+        <div class="row">
+          <span class="verb">GET</span>
+          <span class="path">eliteescapetourism.com<span class="dim">/shop.php?detail/160323604</span></span>
+          <span class="tag">JP resale · sleeping mat</span>
+        </div>
+        <div class="row">
+          <span class="verb">GET</span>
+          <span class="path">eliteescapetourism.com<span class="dim">/shop.php?detail/279079414</span></span>
+          <span class="tag">JP resale · streetwear</span>
+        </div>
+        <div class="row">
+          <span class="verb">GET</span>
+          <span class="path">eliteescapetourism.com<span class="dim">/shop.php?detail/102403900</span></span>
+          <span class="tag">JP resale · golf driver</span>
+        </div>
+        <div class="row">
+          <span class="verb">GET</span>
+          <span class="path">eliteescapetourism.com<span class="dim">/category/hetxpand-com/</span></span>
+          <span class="tag">orphan taxonomy</span>
+        </div>
+      </div>
+      <div class="foot">None of this is yours. <b>All of it is currently outranking your Bali, Russia, UK and Paris packages</b> for anyone searching your name.</div>
+    </div>
+  </div>
+</section>
+
+<section id="vision">
+  <div class="wrap split">
+    <div class="reveal">
+      <p class="eyebrow on-light">The fix, part one</p>
+      <h2>A concierge that never logs off.</h2>
+      <p class="lede">Every enquiry — visa question, Bali quote, airport transfer at 2am — gets a first reply before the guest puts their phone down. A human takes over the moment it gets specific.</p>
+
+      <ul class="checklist">
+        <li>
+          <span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="#071022" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="txt"><b>Replies in the guest's own language, instantly</b><span>WhatsApp, Instagram DM, and the contact form all land in one place.</span></span>
+        </li>
+        <li>
+          <span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="#071022" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="txt"><b>Pre-qualifies before a human sees it</b><span>Dates, party size and budget are captured before it hits your team.</span></span>
+        </li>
+        <li>
+          <span class="tick"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="#071022" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="txt"><b>Nothing lives in someone's personal phone</b><span>One owner dashboard — every thread, every status, always visible.</span></span>
+        </li>
+      </ul>
+
+      <div class="stat-row">
+        <div class="stat"><div class="num">&lt;5min</div><div class="lbl">first reply, day or night</div></div>
+        <div class="stat"><div class="num">100%</div><div class="lbl">enquiries triaged pre-human</div></div>
+        <div class="stat"><div class="num">1</div><div class="lbl">dashboard, zero missed DMs</div></div>
+      </div>
+    </div>
+
+    <div class="reveal d2">
+      <div class="phone">
+        <span class="badge">24/7</span>
+        <div class="ph-head">
+          <div class="av"></div>
+          <div><span>Elite Escape Concierge</span><small>WhatsApp Business · online</small></div>
+        </div>
+        <div class="bubble in">Hi! Do I need a transit visa for a 5-hour layover in Dubai? ✈️</div>
+        <div class="bubble out">No transit visa needed under 8 hours if you don't leave the airport — happy to double check your nationality if you share it.</div>
+        <div class="bubble in">UK passport, landing from Bali on the 14th</div>
+        <div class="typing"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="rebuild">
+  <div class="wrap">
+    <div class="head reveal">
+      <p class="eyebrow on-light">The fix, part two</p>
+      <h2>Rebuilt around what you actually sell.</h2>
+      <p>Same business, same packages — a site that finally gets out of their way.</p>
+    </div>
+
+    <div class="compare">
+      <div class="cmp-row reveal from-left">
+        <div class="cmp-half before"><span class="cmp-tag">Before</span><h4>Type &amp; hierarchy</h4><p>Default theme type, one size for every heading, packages competing with spam posts for attention.</p></div>
+        <div class="cmp-half after"><span class="cmp-tag">After</span><h4>Type &amp; hierarchy</h4><p>A real scale your Bali, Russia, UK and Paris packages can stand under — one clear read from headline to price.</p></div>
+      </div>
+      <div class="cmp-row reveal from-right">
+        <div class="cmp-half before"><span class="cmp-tag">Before</span><h4>Structure</h4><p><code>/goods.php</code> and <code>/shop.php</code> still resolve. An orphan WordPress category nobody remembers creating.</p></div>
+        <div class="cmp-half after"><span class="cmp-tag">After</span><h4>Structure</h4><p>Every route accounted for. No orphan pages, no legacy scripts quietly serving someone else's inventory.</p></div>
+      </div>
+      <div class="cmp-row reveal from-left">
+        <div class="cmp-half before"><span class="cmp-tag">Before</span><h4>Pricing copy</h4><p>"Starting From AED 4000 AED 5000 AED 4000 Per Person" — three prices, one line, zero confidence.</p></div>
+        <div class="cmp-half after"><span class="cmp-tag">After</span><h4>Pricing copy</h4><p>"From AED 4,000 per person — 6 nights, hotel + breakfast." One number, everything it includes.</p></div>
+      </div>
+      <div class="cmp-row reveal from-right">
+        <div class="cmp-half before"><span class="cmp-tag">Before</span><h4>Trust signals</h4><p>No visible license or security marks — on a domain currently indexed selling secondhand golf clubs.</p></div>
+        <div class="cmp-half after"><span class="cmp-tag">After</span><h4>Trust signals</h4><p>Verified badges, real guest reviews, a domain that shows only Elite Escape — because it only serves Elite Escape.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="proof">
+  <div class="wrap">
+    <div class="head reveal">
+      <p class="eyebrow" style="justify-content:center;">30-day target, from launch</p>
+      <h2>What "fixed" looks like, measured.</h2>
+      <p>Not a promise — the scoreboard we'll show you at day 30.</p>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi reveal">
+        <div class="lbl">Spam routes removed</div>
+        <div class="val"><span class="cnt" data-target="6" data-suffix="/6">0/6</span></div>
+        <div class="bar"><i style="--w:0%" data-w="100%"></i></div>
+        <div class="target">goods.php, shop.php &amp; the orphan category — all gone</div>
+      </div>
+      <div class="kpi reveal d2">
+        <div class="lbl">First-reply time</div>
+        <div class="val">Hours <span class="arrow">→</span> <span class="cnt" data-target="5">0</span>min</div>
+        <div class="bar"><i style="--w:0%" data-w="92%"></i></div>
+        <div class="target">manual replies replaced by the AI concierge</div>
+      </div>
+      <div class="kpi reveal d3">
+        <div class="lbl">Spam pages indexed by Google</div>
+        <div class="val"><span class="cnt" data-target="5">0</span> <span class="arrow">→</span> 0</div>
+        <div class="bar"><i style="--w:0%" data-w="100%"></i></div>
+        <div class="target">de-indexed and removed at the source</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="offer">
+  <div class="wrap">
+    <div class="head reveal">
+      <p class="eyebrow" style="justify-content:center;">Start here</p>
+      <h2>A free 60-minute audit of what's live on your domain right now.</h2>
+      <p>We walk every indexed page under eliteescapetourism.com with you, flag exactly what's yours and what isn't, and leave you a plain-English priority list either way.</p>
+    </div>
+
+    <div class="tiers reveal">
+      <div class="tier">
+        <div class="tname">Foundation</div>
+        <div class="tprice">One-time cleanup</div>
+        <ul>
+          <li>Remove goods.php / shop.php &amp; the orphan category</li>
+          <li>Full content &amp; image restoration</li>
+          <li>Structured data for every tour package</li>
+        </ul>
+      </div>
+      <div class="tier hi">
+        <div class="tname">Growth</div>
+        <div class="tprice">AED 5,999 / month</div>
+        <ul>
+          <li>Everything in Foundation</li>
+          <li>24/7 AI concierge across WhatsApp &amp; DM</li>
+          <li>One owner dashboard, every enquiry</li>
+          <li>Monthly reporting against the scoreboard above</li>
+        </ul>
+      </div>
+      <div class="tier">
+        <div class="tname">Enterprise</div>
+        <div class="tprice">Custom scope</div>
+        <ul>
+          <li>Everything in Growth</li>
+          <li>Custom automations per package</li>
+          <li>Dedicated success lead</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="cta-block reveal">
+      <a class="cta-btn" href="mailto:inquiries@eliteescapetourism.com?subject=Free%2060-minute%20AI%20Audit">Book the free audit <span>→</span></a>
+      <div class="cta-sub">or call <a href="tel:+971555753133">+971 55 575 3133</a> · <a href="mailto:inquiries@eliteescapetourism.com">inquiries@eliteescapetourism.com</a></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap fwrap">
+    <div class="fmark">
+      <svg width="20" height="20" viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M50 12 A38 38 0 1 1 15 62" fill="none" stroke="#3fd0f0" stroke-width="11" stroke-linecap="round"/>
+        <polygon points="18,66 34,58 28,74" fill="#3fd0f0"/>
+      </svg>
+      ELITE ESCAPE TOURISM LLC
+    </div>
+    <div class="fmeta">
+      <span>Office 305, Damas Dubai Tower, Rigga Al Buteen, Dubai, UAE</span>
+      <a href="tel:+971555753133">+971 55 575 3133</a>
+      <a href="mailto:inquiries@eliteescapetourism.com">inquiries@eliteescapetourism.com</a>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top:1.2rem; font-size:0.75rem; opacity:0.6;">Transformation proposal prepared by DigitalBurj · placeholder figures marked as targets, not results.</div>
+</footer>
+
+<script>
+(function(){
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // nav reveal
+  var nav = document.getElementById('nav');
+  var hero = document.getElementById('hero');
+  var navObserver = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      nav.classList.toggle('show', !e.isIntersecting || e.intersectionRatio < 0.6);
+    });
+  }, { threshold: [0, 0.6] });
+  navObserver.observe(hero);
+
+  // scroll reveal
+  var revealEls = document.querySelectorAll('.reveal');
+  if (reduced) {
+    revealEls.forEach(function(el){ el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.18, rootMargin: '0px 0px -8% 0px' });
+    revealEls.forEach(function(el){ io.observe(el); });
+  }
+
+  // count-up numbers
+  var counters = document.querySelectorAll('.cnt');
+  var countObserver = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (!entry.isIntersecting) return;
+      var el = entry.target;
+      var target = parseFloat(el.getAttribute('data-target'));
+      var suffix = el.getAttribute('data-suffix') || '';
+      countObserver.unobserve(el);
+      if (reduced) { el.textContent = target + suffix; return; }
+      var start = null, dur = 1300;
+      function step(ts){
+        if (!start) start = ts;
+        var p = Math.min((ts - start) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 3);
+        var val = Math.round(target * eased);
+        el.textContent = val + suffix;
+        if (p < 1) requestAnimationFrame(step);
+        else el.textContent = target + suffix;
+      }
+      requestAnimationFrame(step);
+    });
+  }, { threshold: 0.6 });
+  counters.forEach(function(el){ countObserver.observe(el); });
+
+  // kpi bars
+  var bars = document.querySelectorAll('.kpi .bar i');
+  var barObserver = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (!entry.isIntersecting) return;
+      var el = entry.target;
+      el.style.setProperty('--w', el.getAttribute('data-w'));
+      barObserver.unobserve(el);
+    });
+  }, { threshold: 0.5 });
+  bars.forEach(function(el){ barObserver.observe(el); });
+
+  // orbit scroll track
+  var dot = document.getElementById('orbit-dot');
+  var ticking = false;
+  function updateOrbit(){
+    var scrollTop = window.scrollY || document.documentElement.scrollTop;
+    var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    var pct = docHeight > 0 ? scrollTop / docHeight : 0;
+    dot.style.transform = 'translateY(' + (pct * (window.innerHeight - 12)) + 'px)';
+    ticking = false;
+  }
+  window.addEventListener('scroll', function(){
+    if (!ticking) { requestAnimationFrame(updateOrbit); ticking = true; }
+  }, { passive: true });
+  updateOrbit();
+})();
+</script>
