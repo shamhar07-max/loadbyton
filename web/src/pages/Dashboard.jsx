@@ -76,7 +76,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container-page py-10">
+    <div className="container-page py-10" dir="ltr">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Welcome back, {user?.profile?.company_name}</h1>

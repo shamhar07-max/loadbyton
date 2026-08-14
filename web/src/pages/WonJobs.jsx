@@ -22,7 +22,7 @@ export default function WonJobs() {
   }, [user.id]);
 
   return (
-    <div className="container-page py-10">
+    <div className="container-page py-10" dir="ltr">
       <h1 className="font-display text-2xl font-semibold text-ink">Won jobs</h1>
       <p className="mt-1 text-sm text-ink-muted">Your active shipments — from award through delivery. Open a job to advance its status, upload POD, or chat with the shipper.</p>
 

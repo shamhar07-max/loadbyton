@@ -35,7 +35,7 @@ export default function MyBids() {
 
   if (bids === null) {
     return (
-      <div className="container-page py-10">
+      <div className="container-page py-10" dir="ltr">
         <h1 className="font-display text-2xl font-semibold text-ink">My bids</h1>
         <p className="mt-1 text-sm text-ink-muted">Loading…</p>
       </div>
@@ -43,7 +43,7 @@ export default function MyBids() {
   }
 
   return (
-    <div className="container-page py-10">
+    <div className="container-page py-10" dir="ltr">
       <h1 className="font-display text-2xl font-semibold text-ink">My bids</h1>
       <p className="mt-1 text-sm text-ink-muted">Your competitive quotes on open loads.</p>
 

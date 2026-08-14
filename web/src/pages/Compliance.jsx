@@ -10,7 +10,7 @@ export default function Compliance() {
   usePageTitle('Compliance');
   useMeta('How Loadbyton handles personal data under UAE PDPL, VAT invoicing, and where account data is hosted.');
   return (
-    <div className="container-page max-w-2xl py-16">
+    <div className="container-page max-w-2xl py-16" dir="ltr">
       <h1 className="font-display text-3xl font-semibold text-ink md:text-4xl">Compliance</h1>
 
       <h2 className="mt-8 font-display text-lg font-semibold text-ink">Data protection (UAE PDPL)</h2>

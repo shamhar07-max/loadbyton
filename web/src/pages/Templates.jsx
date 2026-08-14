@@ -44,7 +44,7 @@ export default function Templates() {
   }
 
   return (
-    <div className="container-page py-10">
+    <div className="container-page py-10" dir="ltr">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Templates</h1>

@@ -17,7 +17,7 @@ export default function Pricing() {
   useEffect(() => { api.publicMarket().then((d) => setTakeRate(d.market.takeRate)).catch(() => {}); }, []);
 
   return (
-    <div className="container-page py-16">
+    <div className="container-page py-16" dir="ltr">
       <div className="max-w-2xl">
         <h1 className="font-display text-3xl font-semibold text-ink md:text-4xl">One take rate. No subscription, no listing fee.</h1>
         <p className="mt-4 text-lg text-ink-secondary">

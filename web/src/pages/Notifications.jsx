@@ -21,7 +21,7 @@ export default function Notifications() {
   }
 
   return (
-    <div className="container-page py-10">
+    <div className="container-page py-10" dir="ltr">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl font-semibold text-ink">Notifications</h1>
         {items && items.some((n) => !n.is_read) && <Button variant="secondary" onClick={markRead}>Mark all read</Button>}

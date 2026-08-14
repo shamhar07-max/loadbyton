@@ -24,7 +24,7 @@ export default function Blog() {
   usePageTitle('Blog');
   useMeta('Notes on UAE drayage, demurrage, and building a freight marketplace that survives past the first job.');
   return (
-    <div className="container-page max-w-2xl py-16">
+    <div className="container-page max-w-2xl py-16" dir="ltr">
       <h1 className="font-display text-3xl font-semibold text-ink md:text-4xl">Notes from building Loadbyton</h1>
       <div className="mt-10 space-y-10">
         {POSTS.map((p) => (

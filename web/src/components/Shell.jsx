@@ -7,9 +7,9 @@ import { useToasts } from './Toast.jsx';
 
 export function Logo({ dark = false, className = '' }) {
   return (
-    <Link to="/" className={`flex items-center gap-2 ${className}`} aria-label="Loadbyton home">
+    <Link to="/" className={`flex shrink-0 items-center gap-2 ${className}`} aria-label="Loadbyton home">
       <img src="/brand/logo-mark.svg" alt="" width={28} height={28} style={{ color: dark ? '#F8FAFC' : 'var(--brand-primary)' }} />
-      <span className="font-display text-lg font-semibold tracking-tight" style={{ color: dark ? '#F8FAFC' : 'var(--text-primary)' }}>
+      <span className="whitespace-nowrap font-display text-lg font-semibold tracking-tight" style={{ color: dark ? '#F8FAFC' : 'var(--text-primary)' }}>
         Loadbyton
       </span>
     </Link>
@@ -99,10 +99,10 @@ export function Shell({ children }) {
             </nav>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}
-              className="nav-link text-sm font-semibold"
+              className="nav-link hidden text-sm font-semibold sm:inline-flex"
               aria-label={locale === 'ar' ? 'Switch to English' : 'التبديل إلى العربية'}
               title={locale === 'ar' ? 'Switch to English' : 'التبديل إلى العربية'}
             >
@@ -178,6 +178,12 @@ export function Shell({ children }) {
                   {item.label}
                 </NavLink>
               ))}
+              <button
+                onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}
+                className="nav-link text-left"
+              >
+                {locale === 'ar' ? 'English' : 'العربية'}
+              </button>
             </div>
           </nav>
         )}
@@ -200,7 +206,7 @@ export function Shell({ children }) {
             <Link to="/security" className="hover:text-ink">Security</Link>
             <Link to="/compliance" className="hover:text-ink">Compliance</Link>
           </div>
-          <p className="text-xs text-ink-muted">© {new Date().getFullYear()} Loadbyton. Demo system — payouts are simulated, not real transfers.</p>
+          <p className="text-xs text-ink-muted" dir="ltr">© {new Date().getFullYear()} Loadbyton. Demo system — payouts are simulated, not real transfers.</p>
         </div>
       </footer>
     </div>

@@ -20,7 +20,7 @@ export default function OpenLoads() {
   const filteredJobs = equipmentFilter === 'all' ? jobs : jobs?.filter((j) => j.equipment_type === equipmentFilter);
 
   return (
-    <div className="container-page py-10">
+    <div className="container-page py-10" dir="ltr">
       <h1 className="font-display text-2xl font-semibold text-ink">Open loads</h1>
       <p className="mt-1 text-sm text-ink-muted">Verified carriers can bid price + ETA. Competitor amounts stay hidden until award.</p>
 

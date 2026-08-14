@@ -5,7 +5,7 @@ export default function About() {
   usePageTitle('About');
   useMeta('Loadbyton is a UAE road freight & container drayage marketplace built to make the second shipment happen on-platform, not on WhatsApp.');
   return (
-    <div className="container-page max-w-2xl py-16">
+    <div className="container-page max-w-2xl py-16" dir="ltr">
       <h1 className="font-display text-3xl font-semibold text-ink md:text-4xl">Built for the second shipment, not just the first.</h1>
       <div className="mt-6 space-y-5 text-base leading-relaxed text-ink-secondary">
         <p>

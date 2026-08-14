@@ -97,7 +97,7 @@ export default function JobDetail() {
   }
 
   return (
-    <div className="container-page py-10">
+    <div className="container-page py-10" dir="ltr">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="font-mono text-xs text-ink-muted">{job.job_code}</p>

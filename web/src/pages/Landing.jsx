@@ -86,6 +86,12 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Everything below is still English-only (see lib/i18n.jsx's scope
+          note) — wrapped in dir="ltr" so untranslated sentences read
+          correctly under the Arabic locale instead of having their
+          terminal punctuation flip to the front of the line, the way
+          plain RTL inheritance does to unmarked English text. */}
+      <div dir="ltr">
       {/* How it works — a real sequence, numbering earns its place here. */}
       <section className="border-b py-16" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page">
@@ -207,6 +213,7 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      </div>
     </div>
   );
 }

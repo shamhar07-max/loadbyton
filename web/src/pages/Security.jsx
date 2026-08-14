@@ -30,7 +30,7 @@ export default function Security() {
   usePageTitle('Security');
   useMeta('How Loadbyton protects account, financial, and shipment data — what is built today, and what is on the roadmap.');
   return (
-    <div className="container-page max-w-2xl py-16">
+    <div className="container-page max-w-2xl py-16" dir="ltr">
       <h1 className="font-display text-3xl font-semibold text-ink md:text-4xl">Security</h1>
       <p className="mt-4 text-base leading-relaxed text-ink-secondary">
         This page lists what is actually implemented, not a marketing checklist. Where something isn't done yet,

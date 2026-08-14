@@ -167,7 +167,7 @@ export default function Profile() {
   }
 
   return (
-    <div className="container-page max-w-2xl py-10">
+    <div className="container-page max-w-2xl py-10" dir="ltr">
       <h1 className="font-display text-2xl font-semibold text-ink">Profile & settings</h1>
       <p className="mt-1 text-sm text-ink-muted">{user.email} · {user.role} · Tier {user.tier}</p>
       {actingAs && (

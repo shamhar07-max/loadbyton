@@ -18,7 +18,7 @@ export default function Features() {
   usePageTitle('Features');
   useMeta('Escrow-backed freight jobs across the UAE, 12 equipment types, volume inquiries, live tracking, contract lanes and a verified carrier network — everything Loadbyton ships.');
   return (
-    <div className="container-page py-16">
+    <div className="container-page py-16" dir="ltr">
       <div className="max-w-2xl">
         <h1 className="font-display text-3xl font-semibold text-ink md:text-4xl">Everything it takes to stop re-negotiating the same shipment.</h1>
         <p className="mt-4 text-lg text-ink-secondary">Loadbyton isn't a listings board. It's the escrow, the state machine, and the paper trail a drayage marketplace actually needs.</p>

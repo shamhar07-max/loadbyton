@@ -15,7 +15,7 @@ export default function Admin() {
   const [tab, setTab] = useState('Health');
 
   return (
-    <div className="container-page py-10">
+    <div className="container-page py-10" dir="ltr">
       <h1 className="font-display text-2xl font-semibold text-ink">Admin console</h1>
       <p className="mt-1 text-sm text-ink-muted">Verification, escrow oversight, disputes, and the audit trail.</p>
 
