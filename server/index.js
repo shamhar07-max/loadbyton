@@ -371,6 +371,46 @@ setInterval(() => runAutoReleaseSweep(null), 10 * 60 * 1000).unref();
 // 2. Auth
 // =============================================================================
 
+// One-time, self-closing admin provisioning for production. F1 (gstack
+// review) stopped admin@loadbyton.ae from being auto-seeded in production —
+// correctly, since that was a public, known credential — but that means a
+// real deployment needs *some* way to get its first admin account. This is
+// that way: it requires a secret only the operator knows (ADMIN_SETUP_KEY,
+// set as an env var — never a default, so an unset key means this route is
+// permanently 403, fail-closed) AND it refuses to run at all once a single
+// ADMIN account exists. There is no cleanup step to forget — the route
+// locks itself the moment it's used once, whether or not ADMIN_SETUP_KEY is
+// ever unset afterward.
+app.post(
+  '/api/system/setup-admin',
+  asyncHandler(async (req, res) => {
+    const key = req.headers['x-setup-key'];
+    if (!process.env.ADMIN_SETUP_KEY || typeof key !== 'string' || !timingSafeEqualStr(key, process.env.ADMIN_SETUP_KEY)) {
+      return sendError(res, 403, 'ADMIN_SETUP_KEY header required and must match the environment variable of the same name');
+    }
+    const adminExists = db.prepare(`SELECT 1 FROM users WHERE role='ADMIN' LIMIT 1`).get();
+    if (adminExists) return sendError(res, 403, 'An admin account already exists — this route only ever provisions the first one');
+
+    const { email, password, companyName } = req.body || {};
+    if (!email || !password) return sendError(res, 400, 'email and password are required');
+    if (!isPasswordValid(password)) return sendError(res, 400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    if (db.prepare('SELECT id FROM users WHERE email=?').get(email)) return sendError(res, 400, 'An account with that email already exists');
+
+    const passwordHash = bcrypt.hashSync(password, 10);
+    const userResult = db
+      .prepare(
+        `INSERT INTO users (email, password_hash, role, is_verified, tier, referral_code, email_verified_at)
+         VALUES (?,?,?,?,?,?,datetime('now'))`
+      )
+      .run(email, passwordHash, 'ADMIN', 1, 'GOLD', referralCode('ADM', companyName || 'LOADBYTON'));
+    const userId = Number(userResult.lastInsertRowid);
+    db.prepare('INSERT INTO profiles (user_id, company_name) VALUES (?,?)').run(userId, companyName || 'Loadbyton Ops');
+
+    writeAudit(req, { userId, action: 'ADMIN_SETUP', details: `First admin account provisioned: ${email}`, entityType: 'user', entityId: userId });
+    res.status(201).json({ ok: true, message: 'Admin account created. This route is now permanently disabled.' });
+  })
+);
+
 app.post(
   '/api/auth/register',
   asyncHandler(async (req, res) => {
