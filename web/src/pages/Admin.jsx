@@ -19,7 +19,7 @@ export default function Admin() {
       <h1 className="font-display text-2xl font-semibold text-ink">Admin console</h1>
       <p className="mt-1 text-sm text-ink-muted">Verification, escrow oversight, disputes, and the audit trail.</p>
 
-      <div className="mt-6 flex gap-1 overflow-x-auto border-b" style={{ borderColor: 'var(--border-default)' }}>
+      <div className="mt-6 flex gap-1 overflow-x-auto scroll-fade-x border-b" style={{ borderColor: 'var(--border-default)' }}>
         {TABS.map((t) => (
           <button
             key={t}
@@ -62,7 +62,7 @@ function HealthTab() {
       </div>
       <p className="mt-6 mb-3 text-sm font-medium text-ink-secondary">Lane health</p>
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto scroll-fade-x">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
@@ -295,7 +295,7 @@ function PayoutsSlaTab() {
         <EmptyState icon={<IconCheck size={28} />} title="Nothing outstanding" description="Every released payout has a confirmed transfer." />
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scroll-fade-x">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
@@ -472,7 +472,7 @@ function MembersTab() {
       ) : filteredUsers.length === 0 ? (
         <EmptyState icon={<IconUser size={26} />} title="No members found" description="Try adjusting the filters above." />
       ) : (
-        <div className="mt-6 overflow-x-auto">
+        <div className="mt-6 overflow-x-auto scroll-fade-x">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
@@ -535,7 +535,7 @@ function RegistrationsTab() {
       ) : referrals.length === 0 ? (
         <EmptyState icon={<IconInfo size={26} />} title="No referrals yet" description="Sign-ups that used a referral code will show up here." />
       ) : (
-        <div className="mt-6 overflow-x-auto">
+        <div className="mt-6 overflow-x-auto scroll-fade-x">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>

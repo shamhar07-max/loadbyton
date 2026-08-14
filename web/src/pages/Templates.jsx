@@ -45,12 +45,12 @@ export default function Templates() {
 
   return (
     <div className="container-page py-10" dir="ltr">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Templates</h1>
           <p className="mt-1 text-sm text-ink-muted">Save a repeat lane once. Re-run it into a fresh open job in one click.</p>
         </div>
-        <Button onClick={() => setShowForm((v) => !v)}><IconPlus size={16} /> New template</Button>
+        <Button onClick={() => setShowForm((v) => !v)} className="self-start"><IconPlus size={16} /> New template</Button>
       </div>
 
       {showForm && (

@@ -23,7 +23,7 @@ function StatusStepper({ job }) {
   const idx = STATUS_FLOW.indexOf(job.status);
   const terminal = job.status === 'CANCELLED' || job.status === 'DISPUTED';
   return (
-    <div className="flex items-center gap-1 overflow-x-auto pb-1">
+    <div className="flex items-center gap-1 overflow-x-auto scroll-fade-x pb-1">
       {STATUS_FLOW.slice(1).map((s, i) => {
         const stepIdx = STATUS_FLOW.indexOf(s);
         const done = !terminal && stepIdx <= idx;
@@ -364,7 +364,7 @@ function DocumentList({ documents, jobId, onAdd }) {
           ))}
         </ul>
       )}
-      <form onSubmit={submit} className="mt-4 grid grid-cols-[110px,1fr,1fr,auto] gap-2 border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
+      <form onSubmit={submit} className="mt-4 grid grid-cols-1 gap-2 border-t pt-4 sm:grid-cols-[110px,1fr,1fr,auto]" style={{ borderColor: 'var(--border-subtle)' }}>
         <select className="input" value={form.docType} onChange={(e) => setForm({ ...form, docType: e.target.value })}>
           {['CUSTOMS', 'RECEIPT', 'POD', 'LICENCE', 'INSURANCE', 'OTHER'].map((t) => <option key={t}>{t}</option>)}
         </select>

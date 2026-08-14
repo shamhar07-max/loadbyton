@@ -33,7 +33,7 @@ export default function WonJobs() {
           ) : jobs.length === 0 ? (
             <EmptyState icon={<IconPackage size={28} />} title="No won jobs yet" description="Place bids, get awarded, and start earning." />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto scroll-fade-x">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>

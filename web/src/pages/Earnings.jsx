@@ -123,7 +123,7 @@ export default function Earnings() {
           <EmptyState icon={<IconPackage size={28} />} title="No payouts match these filters" description="Try a wider date range or release type." />
         ) : (
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto scroll-fade-x">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b text-xs uppercase tracking-wide text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>

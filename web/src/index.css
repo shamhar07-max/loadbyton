@@ -266,6 +266,17 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
     @apply mx-auto w-full max-w-content px-5 sm:px-6 lg:px-8;
   }
 
+  /* Fades the trailing edge of a horizontally-scrollable, dir=ltr container
+     (a data table, a tab bar, the job-status stepper) so a mobile user sees
+     a visual cue that there's more content to swipe to, instead of a hard
+     edge that reads as "the page cut off" — these all already scroll
+     correctly, they just gave no hint that they do. Right-edge fade only:
+     every container this is applied to is explicitly dir="ltr". */
+  .scroll-fade-x {
+    mask-image: linear-gradient(to right, black calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent);
+  }
+
   .card {
     @apply rounded-lg bg-surface shadow-sm transition-shadow duration-300 ease-out;
     border: 1px solid var(--border-subtle);
