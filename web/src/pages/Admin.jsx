@@ -95,6 +95,7 @@ function VerificationTab() {
   const [queue, setQueue] = useState(null);
   const [ibanDrafts, setIbanDrafts] = useState({});
   const [busyId, setBusyId] = useState(null);
+  const { addToast } = useToasts();
 
   function load() {
     api.adminVerificationQueue().then((d) => setQueue(d.queue)).catch(() => setQueue([]));
@@ -106,6 +107,8 @@ function VerificationTab() {
     try {
       await api.adminVerify(id, { action, iban: ibanDrafts[id] || undefined });
       load();
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not update verification', body: err.message });
     } finally {
       setBusyId(null);
     }
@@ -148,6 +151,7 @@ function DisputesTab() {
   const [form, setForm] = useState({ jobId: '', reason: '' });
   const [resolveDrafts, setResolveDrafts] = useState({});
   const [busy, setBusy] = useState(false);
+  const { addToast } = useToasts();
 
   function load() {
     api.adminDisputes().then((d) => setDisputes(d.disputes)).catch(() => setDisputes([]));
@@ -161,6 +165,8 @@ function DisputesTab() {
       await api.adminOpenDispute({ jobId: Number(form.jobId), reason: form.reason });
       setForm({ jobId: '', reason: '' });
       load();
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not open dispute', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -171,6 +177,8 @@ function DisputesTab() {
     try {
       await api.adminResolveDispute(id, { decision, determination: resolveDrafts[id] || '' });
       load();
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not resolve dispute', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -351,6 +359,7 @@ function SettingsTab() {
   const [saved, setSaved] = useState(false);
   const [sweeping, setSweeping] = useState(false);
   const [sweepResult, setSweepResult] = useState(null);
+  const { addToast } = useToasts();
 
   function load() {
     api.adminGetSettings().then((d) => setSettings(d.settings)).catch(() => {});
@@ -365,6 +374,8 @@ function SettingsTab() {
       const d = await api.adminUpdateSettings(settings);
       setSettings(d.settings);
       setSaved(true);
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not save settings', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -375,6 +386,8 @@ function SettingsTab() {
     try {
       const d = await api.runAutoRelease();
       setSweepResult(d.message);
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Sweep failed', body: err.message });
     } finally {
       setSweeping(false);
     }

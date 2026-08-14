@@ -17,7 +17,7 @@ export default function OpenLoads() {
     api.listJobs({ status: 'OPEN' }).then((d) => setJobs(d.jobs)).catch(() => setJobs([]));
   }, []);
 
-  const filteredJobs = equipmentFilter === 'all' ? jobs : jobs?.filter((j) => j.equipment_type === equipmentFilter);
+  const filteredJobs = jobs === null ? null : equipmentFilter === 'all' ? jobs : jobs.filter((j) => j.equipment_type === equipmentFilter);
 
   return (
     <div className="container-page py-10" dir="ltr">
@@ -55,12 +55,10 @@ export default function OpenLoads() {
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
-                    {!!(j.requires_hazmat || j.requires_reefer) && (
-                      <Badge color="warning">{j.requires_hazmat ? 'Hazmat' : 'Reefer'}</Badge>
-                    )}
-                    {(j.container_count > 1 || j.truck_count > 1) && (
-                      <Badge color="accent">{j.container_count > 1 ? `×${j.container_count} containers` : `×${j.truck_count} trucks`}</Badge>
-                    )}
+                    {!!j.requires_hazmat && <Badge color="warning">Hazmat</Badge>}
+                    {!!j.requires_reefer && <Badge color="warning">Reefer</Badge>}
+                    {j.container_count > 1 && <Badge color="accent">×{j.container_count} containers</Badge>}
+                    {j.truck_count > 1 && <Badge color="accent">×{j.truck_count} trucks</Badge>}
                   </div>
                 </div>
                 <div className="mt-4 space-y-1.5 text-sm text-ink-secondary">

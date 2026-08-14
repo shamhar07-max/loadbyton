@@ -532,8 +532,15 @@ app.patch('/api/org/members/:id', auth(['SHIPPER', 'CARRIER']), requireSeatRole(
 // 3. Public
 // =============================================================================
 
+// s-maxage lets Cloudflare edge-cache these for a short window without a
+// Render origin round-trip on every hit; max-age=0 keeps browsers always
+// revalidating so a signed-out visitor never sees minutes-stale numbers.
+// stale-while-revalidate covers the gap so a cache miss doesn't block on
+// origin while it refreshes.
+const PUBLIC_JSON_CACHE = 'public, max-age=0, s-maxage=30, stale-while-revalidate=60';
+
 app.get('/api/public/lanes', (req, res) => {
-  res.json({ lanes: unifiedLanes });
+  res.set('Cache-Control', PUBLIC_JSON_CACHE).json({ lanes: unifiedLanes });
 });
 
 app.get('/api/public/carriers', (req, res) => {
@@ -545,7 +552,7 @@ app.get('/api/public/carriers', (req, res) => {
        ORDER BY p.rating_avg DESC`
     )
     .all();
-  res.json({
+  res.set('Cache-Control', PUBLIC_JSON_CACHE).json({
     carriers: rows.map((r) => ({
       id: r.id,
       name: r.company_name,
@@ -564,7 +571,7 @@ app.get('/api/public/market', (req, res) => {
   const openJobs = db.prepare(`SELECT COUNT(*) c FROM jobs WHERE status='OPEN'`).get().c;
   const avgDrayageAED = Math.round(unifiedLanes.reduce((s, l) => s + l.basePriceAed, 0) / unifiedLanes.length);
   const containersPerDay = 300;
-  res.json({
+  res.set('Cache-Control', PUBLIC_JSON_CACHE).json({
     market: {
       teu2024: 15200000,
       containersPerDay,
@@ -604,7 +611,7 @@ app.post('/api/bids/:id/withdraw', auth(['CARRIER']), (req, res) => {
 });
 
 app.get('/api/jobs', auth(), (req, res) => {
-  const { status, limit, offset } = req.query;
+  const { status, limit, offset, mine } = req.query;
   const lim = Math.min(Number(limit) || 50, 200);
   const off = Number(offset) || 0;
   let where = '1=1';
@@ -613,7 +620,11 @@ app.get('/api/jobs', auth(), (req, res) => {
     where = 'shipper_id = ?';
     params.push(req.user.id);
   } else if (req.user.role === 'CARRIER') {
-    where = "(status = 'OPEN' OR carrier_id = ?)";
+    // mine=1 scopes to jobs actually awarded to this carrier, regardless of
+    // status — used by the won-jobs list, which has no use for the flood of
+    // other shippers' OPEN jobs that the default (bidding) view mixes in and
+    // that can push a carrier's own older awarded jobs past the page limit.
+    where = mine ? 'carrier_id = ?' : "(status = 'OPEN' OR carrier_id = ?)";
     params.push(req.user.id);
   }
   if (status) {
@@ -1570,14 +1581,58 @@ function renderSeoPage(res, meta) {
     html = html.replace('<div id="root"></div>', `<div id="root">${prerendered}</div>`);
   }
 
-  res.status(200).set('Content-Type', 'text/html').send(html);
+  // no-cache (not no-store): still cacheable, but every load revalidates
+  // against the ETag Express already attaches to res.send, so a repeat
+  // visitor gets a cheap 304 instead of skipping the request entirely
+  // while still always seeing the current build.
+  res.status(200).set('Content-Type', 'text/html').set('Cache-Control', 'no-cache').send(html);
 }
 
 if (fs.existsSync(DIST_DIR)) {
-  app.use(express.static(DIST_DIR, { index: false }));
+  app.use(
+    express.static(DIST_DIR, {
+      index: false,
+      setHeaders(res, filePath) {
+        // Only /assets/* filenames are content-hashed by the Vite build
+        // (index-<hash>.js/.css) — a change in content is guaranteed to be a
+        // change in URL, so these can be cached forever. Everything else
+        // under dist (favicon.svg, brand/*.svg, __prerendered__/*) keeps
+        // express.static's own default (effectively no caching), since
+        // those filenames don't change when their content does.
+        if (path.join(DIST_DIR, 'assets') === path.dirname(filePath)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      },
+    })
+  );
 }
 
 app.get(['/', '/features', '/pricing', '/about', '/blog', '/security', '/compliance'], (req, res) => renderSeoPage(res, SEO_META[req.path]));
+
+// robots.txt / sitemap.xml previously fell through to the SPA catch-all
+// below and served index.html with a 200 — a search engine reads that as
+// "no crawl rules" / "no sitemap" rather than erroring, so the bug was
+// silent. SEO_META's keys are exactly the routes that get prerendered
+// markup, so the sitemap reuses that object instead of a second hardcoded
+// route list that could drift from it.
+app.get('/robots.txt', (req, res) => {
+  const origin = `${req.protocol}://${req.get('host')}`;
+  res
+    .set('Content-Type', 'text/plain; charset=utf-8')
+    .set('Cache-Control', 'public, max-age=3600')
+    .send(['User-agent: *', 'Allow: /', 'Disallow: /api/', '', `Sitemap: ${origin}/sitemap.xml`, ''].join('\n'));
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const urls = Object.keys(SEO_META)
+    .map((route) => `  <url><loc>${origin}${route}</loc></url>`)
+    .join('\n');
+  res
+    .set('Content-Type', 'application/xml; charset=utf-8')
+    .set('Cache-Control', 'public, max-age=3600')
+    .send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
+});
 
 app.use('/api', (req, res) => sendError(res, 404, 'Not found'));
 
@@ -1585,7 +1640,7 @@ app.get('*', (req, res) => {
   if (!fs.existsSync(DIST_INDEX)) {
     return res.status(200).send('Loadbyton API is running. Start the Vite dev server in web/ (npm run dev) or build it (npm run build) to serve the SPA from here.');
   }
-  res.sendFile(DIST_INDEX);
+  res.sendFile(DIST_INDEX, { headers: { 'Cache-Control': 'no-cache' } });
 });
 
 // eslint-disable-next-line no-unused-vars

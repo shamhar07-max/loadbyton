@@ -6,6 +6,7 @@ import { usePageTitle } from '../lib/seo.jsx';
 import { STATUS_FLOW, formatAED, formatDate, formatDateTime, formatLabel, EQUIPMENT_TYPES, CONTAINER_EQUIPMENT, equipmentLabel } from '../lib/constants.js';
 import { Button, Card, Input, Label, Select, Textarea, Badge, StatusBadge, EscrowBadge, Spinner } from '../components/ui.jsx';
 import { IconCheck, IconClock, IconMapPin, IconFile, IconMessage, IconStar, IconAlert } from '../components/icons.jsx';
+import { useToasts } from '../components/Toast.jsx';
 
 function Section({ title, children, action }) {
   return (
@@ -337,6 +338,7 @@ function PodForm({ jobId, onDone, busy, setBusy, setError }) {
 function DocumentList({ documents, jobId, onAdd }) {
   const [form, setForm] = useState({ docType: 'CUSTOMS', title: '', fileUrl: '' });
   const [busy, setBusy] = useState(false);
+  const { addToast } = useToasts();
   async function submit(e) {
     e.preventDefault();
     if (!form.title || !form.fileUrl) return;
@@ -345,6 +347,8 @@ function DocumentList({ documents, jobId, onAdd }) {
       await api.addDocument(jobId, form);
       setForm({ docType: 'CUSTOMS', title: '', fileUrl: '' });
       onAdd();
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not add document', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -368,8 +372,8 @@ function DocumentList({ documents, jobId, onAdd }) {
         <select className="input" value={form.docType} onChange={(e) => setForm({ ...form, docType: e.target.value })}>
           {['CUSTOMS', 'RECEIPT', 'POD', 'LICENCE', 'INSURANCE', 'OTHER'].map((t) => <option key={t}>{t}</option>)}
         </select>
-        <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-        <Input placeholder="File URL" value={form.fileUrl} onChange={(e) => setForm({ ...form, fileUrl: e.target.value })} />
+        <Input placeholder="Title" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        <Input placeholder="File URL" required type="url" value={form.fileUrl} onChange={(e) => setForm({ ...form, fileUrl: e.target.value })} />
         <Button type="submit" variant="secondary" loading={busy}>Add</Button>
       </form>
     </div>
@@ -380,6 +384,7 @@ function MessageThread({ messages, jobId, onSent }) {
   const { user } = useAuth();
   const [content, setContent] = useState('');
   const [busy, setBusy] = useState(false);
+  const { addToast } = useToasts();
   async function submit(e) {
     e.preventDefault();
     if (!content.trim()) return;
@@ -388,6 +393,8 @@ function MessageThread({ messages, jobId, onSent }) {
       await api.sendMessage(jobId, content);
       setContent('');
       onSent();
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Message not sent', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -418,14 +425,15 @@ function RatingForm({ jobId, onDone }) {
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const { addToast } = useToasts();
   async function submit() {
     setBusy(true);
     try {
       await api.rateJob(jobId, { score, comment });
       setDone(true);
       onDone();
-    } catch (e) {
-      setDone(true);
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Rating not saved', body: err.message });
     } finally {
       setBusy(false);
     }

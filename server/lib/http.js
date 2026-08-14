@@ -48,6 +48,9 @@ function securityHeaders(req, res, next) {
     'Content-Security-Policy',
     "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
   );
+  // Loadbyton never asks for any of these browser capabilities — deny them
+  // outright rather than leaving the default (permissive) policy in place.
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()');
   next();
 }
 

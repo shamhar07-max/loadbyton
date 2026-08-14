@@ -44,7 +44,7 @@ export default function Dashboard() {
     setSubmitting(true);
     setError('');
     try {
-      await api.createJob({
+      const created = await api.createJob({
         ...form,
         maxBudgetAed: form.maxBudgetAed ? Number(form.maxBudgetAed) : undefined,
         containerCount: Number(form.containerCount) || 1,
@@ -55,7 +55,7 @@ export default function Dashboard() {
       addToast({
         type: 'status_change',
         title: 'Job posted',
-        body: `${form.job_code || 'new job'} posted successfully`,
+        body: `${created.job?.job_code || 'New job'} posted successfully`,
       });
       load();
     } catch (err) {
@@ -249,11 +249,8 @@ export default function Dashboard() {
                           <p className="font-medium text-ink">
                             {CONTAINER_EQUIPMENT.includes(j.equipment_type) ? `${j.container_size} ${formatLabel(j.container_type)}` : equipmentLabel(j.equipment_type)}
                           </p>
-                          {(j.container_count > 1 || j.truck_count > 1) && (
-                            <Badge className="mt-1" color="accent">
-                              {j.container_count > 1 ? `×${j.container_count} containers` : `×${j.truck_count} trucks`}
-                            </Badge>
-                          )}
+                          {j.container_count > 1 && <Badge className="mt-1" color="accent">×{j.container_count} containers</Badge>}
+                          {j.truck_count > 1 && <Badge className="mt-1" color="accent">×{j.truck_count} trucks</Badge>}
                         </td>
                         <td className="px-5 py-3 text-ink-secondary">{formatLabel(j.pickup_terminal)} → {formatLabel(j.delivery_area)}</td>
                         <td className="px-5 py-3"><StatusBadge status={j.status} /></td>

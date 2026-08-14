@@ -73,6 +73,8 @@ export default function Earnings() {
     .filter((p) => p.payout_status === 'RELEASED' && isThisCalendarMonth(p.released_at))
     .reduce((s, r) => s + r.net_aed, 0);
 
+  const releasedCount = payouts.filter((p) => p.payout_status === 'RELEASED').length;
+
   const releaseOptions = [
     { label: 'Release: All', value: 'all' },
     { label: 'Manual', value: 'MANUAL' },
@@ -104,7 +106,7 @@ export default function Earnings() {
         <Stat label="Paid out" value={formatAED(totals.paid)} tone="accent" />
         <Stat label="Pending" value={formatAED(totals.pending)} />
         <Stat label="Paid this month" value={formatAED(thisMonthPaid)} />
-        <Stat label="Avg per job" value={totals.paid > 0 ? formatAED(Math.round(totals.paid / (payouts.length || 1))) : '—'} />
+        <Stat label="Avg per job" value={releasedCount > 0 ? formatAED(Math.round(totals.paid / releasedCount)) : '—'} />
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">

@@ -15,8 +15,12 @@ export default function WonJobs() {
   const [jobs, setJobs] = useState(null);
 
   useEffect(() => {
-    api.listJobs({}).then((d) => {
-      const won = d.jobs.filter((j) => j.carrier_id === user.id && ACTIVE_STATUSES.includes(j.status));
+    // mine=1 — this carrier's own jobs only, any status. Filtering client-
+    // side against the default (mixed-in OPEN-jobs-from-everyone) view meant
+    // an older awarded job could fall past the 50-row page limit before this
+    // component ever saw it.
+    api.listJobs({ mine: 1, limit: 200 }).then((d) => {
+      const won = d.jobs.filter((j) => ACTIVE_STATUSES.includes(j.status));
       setJobs(won);
     }).catch(() => setJobs([]));
   }, [user.id]);
