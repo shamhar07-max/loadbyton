@@ -44,7 +44,10 @@ export default function Dashboard() {
     setSubmitting(true);
     setError('');
     try {
-      await api.createJob({
+      // F11 (gstack review): form never had a job_code field — the server
+      // generates it — so the toast always fell back to "new job". Read it
+      // from the create response instead.
+      const { job } = await api.createJob({
         ...form,
         maxBudgetAed: form.maxBudgetAed ? Number(form.maxBudgetAed) : undefined,
         containerCount: Number(form.containerCount) || 1,
@@ -55,7 +58,7 @@ export default function Dashboard() {
       addToast({
         type: 'status_change',
         title: 'Job posted',
-        body: `${form.job_code || 'new job'} posted successfully`,
+        body: `${job.job_code} posted successfully`,
       });
       load();
     } catch (err) {

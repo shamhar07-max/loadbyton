@@ -50,6 +50,10 @@
   --lb-slate-900: #0F172A;
   --lb-slate-700: #334155;
   --lb-slate-500: #64748B;
+  /* gstack review D3: dark-mode --text-muted read at slate-500 in every
+     theme — 4.16:1 on the near-black dark canvas, below AA's 4.5:1.
+     slate-400 sits between muted (500) and secondary (300). */
+  --lb-slate-400: #94A3B8;
   --lb-slate-300: #CBD5E1;
   --lb-slate-200: #E2E8F0;
   --lb-slate-100: #F1F5F9;
@@ -101,13 +105,22 @@
   --text-secondary: var(--lb-slate-700);
   --text-muted: var(--lb-slate-500);
   --text-inverse: var(--lb-slate-0);
-  --text-on-accent: var(--lb-slate-0);
+  /* gstack review D2: white text on orange-600 is 3.25:1, below AA's 4.5:1
+     for .btn-accent. Dark text already passed comfortably (~5.8:1) in the
+     dark-mode blocks below — light mode now matches that same treatment. */
+  --text-on-accent: var(--lb-ink-900);
 
   --brand-primary: var(--lb-ink-900);
   --brand-primary-hover: var(--lb-ink-800);
   --brand-secondary: var(--lb-blue-500);
   --brand-accent: var(--lb-orange-600);
   --brand-accent-hover: var(--lb-orange-700);
+  /* gstack review D4: Badge's "accent" variant and the carrier tier badge
+     read the raw --lb-orange-100 primitive directly (unthemed) — a light
+     peach chip with orange-500 text at ~2.2:1 in dark mode. A semantic
+     token, the same pattern every --status-*-bg already uses, is what lets
+     the dark override below actually apply. */
+  --brand-accent-bg: var(--lb-orange-100);
 
   --status-success: var(--lb-teal-600);
   --status-success-bg: var(--lb-teal-100);
@@ -132,7 +145,7 @@
 
     --text-primary: var(--lb-slate-50);
     --text-secondary: var(--lb-slate-300);
-    --text-muted: var(--lb-slate-500);
+    --text-muted: var(--lb-slate-400);
     --text-inverse: var(--lb-ink-900);
     --text-on-accent: var(--lb-ink-900);
 
@@ -141,6 +154,7 @@
     --brand-secondary: var(--lb-blue-300);
     --brand-accent: var(--lb-orange-500);
     --brand-accent-hover: #FFA05C;
+    --brand-accent-bg: #3A2410;
 
     --status-success: var(--lb-teal-500);
     --status-success-bg: #123832;
@@ -165,7 +179,7 @@
 
   --text-primary: var(--lb-slate-50);
   --text-secondary: var(--lb-slate-300);
-  --text-muted: var(--lb-slate-500);
+  --text-muted: var(--lb-slate-400);
   --text-inverse: var(--lb-ink-900);
   --text-on-accent: var(--lb-ink-900);
 
@@ -174,6 +188,7 @@
   --brand-secondary: var(--lb-blue-300);
   --brand-accent: var(--lb-orange-500);
   --brand-accent-hover: #FFA05C;
+  --brand-accent-bg: #3A2410;
 
   --status-success: var(--lb-teal-500);
   --status-success-bg: #123832;

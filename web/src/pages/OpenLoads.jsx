@@ -17,7 +17,11 @@ export default function OpenLoads() {
     api.listJobs({ status: 'OPEN' }).then((d) => setJobs(d.jobs)).catch(() => setJobs([]));
   }, []);
 
-  const filteredJobs = equipmentFilter === 'all' ? jobs : jobs?.filter((j) => j.equipment_type === equipmentFilter);
+  // F15 (gstack review): `jobs?.filter(...)` on a null `jobs` (still
+  // loading) evaluates to `undefined`, not `null` — the `=== null` check
+  // below then missed it and `.length` on undefined crashed to a white
+  // screen. Keep it `null` explicitly until jobs have actually loaded.
+  const filteredJobs = jobs === null ? null : equipmentFilter === 'all' ? jobs : jobs.filter((j) => j.equipment_type === equipmentFilter);
 
   return (
     <div className="container-page py-10" dir="ltr">
@@ -55,9 +59,11 @@ export default function OpenLoads() {
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
-                    {!!(j.requires_hazmat || j.requires_reefer) && (
-                      <Badge color="warning">{j.requires_hazmat ? 'Hazmat' : 'Reefer'}</Badge>
-                    )}
+                    {/* F20 (gstack review): a job that was both hazmat and
+                        reefer used to render only one badge — the ternary
+                        picked one and dropped the other flag entirely. */}
+                    {!!j.requires_hazmat && <Badge color="warning">Hazmat</Badge>}
+                    {!!j.requires_reefer && <Badge color="info">Reefer</Badge>}
                     {(j.container_count > 1 || j.truck_count > 1) && (
                       <Badge color="accent">{j.container_count > 1 ? `×${j.container_count} containers` : `×${j.truck_count} trucks`}</Badge>
                     )}

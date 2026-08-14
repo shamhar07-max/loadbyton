@@ -92,6 +92,7 @@ function HealthTab() {
 }
 
 function VerificationTab() {
+  const { addToast } = useToasts();
   const [queue, setQueue] = useState(null);
   const [ibanDrafts, setIbanDrafts] = useState({});
   const [busyId, setBusyId] = useState(null);
@@ -106,6 +107,10 @@ function VerificationTab() {
     try {
       await api.adminVerify(id, { action, iban: ibanDrafts[id] || undefined });
       load();
+    } catch (err) {
+      // F16 (gstack review): no catch meant e.g. a missing-IBAN 400 on
+      // approve just... did nothing visible. The admin had no idea it failed.
+      addToast({ type: 'system_message', title: 'Could not update verification', body: err.message });
     } finally {
       setBusyId(null);
     }
@@ -144,6 +149,7 @@ function VerificationTab() {
 }
 
 function DisputesTab() {
+  const { addToast } = useToasts();
   const [disputes, setDisputes] = useState(null);
   const [form, setForm] = useState({ jobId: '', reason: '' });
   const [resolveDrafts, setResolveDrafts] = useState({});
@@ -161,6 +167,10 @@ function DisputesTab() {
       await api.adminOpenDispute({ jobId: Number(form.jobId), reason: form.reason });
       setForm({ jobId: '', reason: '' });
       load();
+    } catch (err) {
+      // F16 (gstack review): no catch here either — e.g. an invalid job ID
+      // failed silently with the form just sitting there.
+      addToast({ type: 'system_message', title: 'Could not open dispute', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -171,6 +181,8 @@ function DisputesTab() {
     try {
       await api.adminResolveDispute(id, { decision, determination: resolveDrafts[id] || '' });
       load();
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not resolve dispute', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -346,6 +358,7 @@ function RevenueTab() {
 }
 
 function SettingsTab() {
+  const { addToast } = useToasts();
   const [settings, setSettings] = useState(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -365,6 +378,10 @@ function SettingsTab() {
       const d = await api.adminUpdateSettings(settings);
       setSettings(d.settings);
       setSaved(true);
+    } catch (err) {
+      // F16 (gstack review): an out-of-range value (e.g. commission_rate_bps
+      // > 10000) used to 400 with zero on-screen feedback.
+      addToast({ type: 'system_message', title: 'Could not save settings', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -375,6 +392,10 @@ function SettingsTab() {
     try {
       const d = await api.runAutoRelease();
       setSweepResult(d.message);
+    } catch (err) {
+      // Same class of bug as F16 elsewhere in this file — not in the
+      // report's cited line range, but identical pattern right next to it.
+      addToast({ type: 'system_message', title: 'Sweep failed', body: err.message });
     } finally {
       setSweeping(false);
     }

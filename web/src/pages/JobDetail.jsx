@@ -6,6 +6,7 @@ import { usePageTitle } from '../lib/seo.jsx';
 import { STATUS_FLOW, formatAED, formatDate, formatDateTime, formatLabel, EQUIPMENT_TYPES, CONTAINER_EQUIPMENT, equipmentLabel } from '../lib/constants.js';
 import { Button, Card, Input, Label, Select, Textarea, Badge, StatusBadge, EscrowBadge, Spinner } from '../components/ui.jsx';
 import { IconCheck, IconClock, IconMapPin, IconFile, IconMessage, IconStar, IconAlert } from '../components/icons.jsx';
+import { useToasts } from '../components/Toast.jsx';
 
 function Section({ title, children, action }) {
   return (
@@ -335,6 +336,7 @@ function PodForm({ jobId, onDone, busy, setBusy, setError }) {
 }
 
 function DocumentList({ documents, jobId, onAdd }) {
+  const { addToast } = useToasts();
   const [form, setForm] = useState({ docType: 'CUSTOMS', title: '', fileUrl: '' });
   const [busy, setBusy] = useState(false);
   async function submit(e) {
@@ -345,6 +347,10 @@ function DocumentList({ documents, jobId, onAdd }) {
       await api.addDocument(jobId, form);
       setForm({ docType: 'CUSTOMS', title: '', fileUrl: '' });
       onAdd();
+    } catch (err) {
+      // F17 (gstack review): this had no catch — a failed add (e.g. a bad
+      // fileUrl) threw as an unhandled rejection and the user saw nothing.
+      addToast({ type: 'system_message', title: 'Could not add document', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -378,6 +384,7 @@ function DocumentList({ documents, jobId, onAdd }) {
 
 function MessageThread({ messages, jobId, onSent }) {
   const { user } = useAuth();
+  const { addToast } = useToasts();
   const [content, setContent] = useState('');
   const [busy, setBusy] = useState(false);
   async function submit(e) {
@@ -388,6 +395,10 @@ function MessageThread({ messages, jobId, onSent }) {
       await api.sendMessage(jobId, content);
       setContent('');
       onSent();
+    } catch (err) {
+      // F17 (gstack review): same missing catch as DocumentList — a failed
+      // send silently vanished with no feedback.
+      addToast({ type: 'system_message', title: 'Message not sent', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -418,14 +429,19 @@ function RatingForm({ jobId, onDone }) {
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
   async function submit() {
     setBusy(true);
+    setError('');
     try {
       await api.rateJob(jobId, { score, comment });
       setDone(true);
       onDone();
-    } catch (e) {
-      setDone(true);
+    } catch (err) {
+      // F14 (gstack review): this used to setDone(true) even on failure,
+      // so a rejected rating (e.g. already rated) silently displayed
+      // "Thanks for the rating" — the user had no idea it didn't save.
+      setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -440,6 +456,7 @@ function RatingForm({ jobId, onDone }) {
           </button>
         ))}
       </div>
+      {error && <p className="text-sm text-status-danger">{error}</p>}
       <Textarea rows={2} placeholder="Optional comment" value={comment} onChange={(e) => setComment(e.target.value)} />
       <Button onClick={submit} loading={busy}>Submit rating</Button>
     </div>

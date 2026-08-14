@@ -64,7 +64,11 @@ export default function Register() {
             </div>
             <div>
               <Label htmlFor="password">{t('auth.password')}</Label>
-              <Input id="password" type="password" required minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" />
+              {/* F2 (gstack review): matches the server's MIN_PASSWORD_LENGTH
+                  (server/index.js) — was 6 here but 8 was the actual floor
+                  once the server started enforcing one, which meant a
+                  6-7 char password passed the browser check and then 400'd. */}
+              <Input id="password" type="password" required minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 8 characters" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

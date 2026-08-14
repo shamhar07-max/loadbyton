@@ -15,7 +15,12 @@ export default function WonJobs() {
   const [jobs, setJobs] = useState(null);
 
   useEffect(() => {
-    api.listJobs({}).then((d) => {
+    // F19 (gstack review): the default page size (50, newest first) meant a
+    // carrier with more than 50 total jobs could have older active/won jobs
+    // fall outside the page and silently vanish from this list. Request the
+    // server's max page size instead — bounded by one carrier's own job
+    // history, which realistically won't exceed it.
+    api.listJobs({ limit: 200 }).then((d) => {
       const won = d.jobs.filter((j) => j.carrier_id === user.id && ACTIVE_STATUSES.includes(j.status));
       setJobs(won);
     }).catch(() => setJobs([]));

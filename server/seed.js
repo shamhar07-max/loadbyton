@@ -19,8 +19,14 @@ module.exports = function seed() {
   const PASSWORD_HASH = bcrypt.hashSync('demo1234', 10);
 
   function insertUser({ email, role, tier, referral_code, is_verified }) {
+    // email_verified_at is set for every seeded account (demo data doesn't
+    // need the F3 verification flow) so the "verify your email" banner
+    // never shows for a freshly-logged-in demo user.
     const r = db
-      .prepare('INSERT INTO users (email, password_hash, role, is_verified, tier, referral_code) VALUES (?,?,?,?,?,?)')
+      .prepare(
+        `INSERT INTO users (email, password_hash, role, is_verified, tier, referral_code, email_verified_at)
+         VALUES (?,?,?,?,?,?,datetime('now'))`
+      )
       .run(email, PASSWORD_HASH, role, is_verified ? 1 : 0, tier, referral_code);
     return Number(r.lastInsertRowid);
   }
@@ -80,8 +86,22 @@ module.exports = function seed() {
     phone: '+971 6 221 7788', zones: 'Sharjah, Al Quoz', fleet: 6, chassis: 2, insurance: false, rating: 5.0, completed: 0,
   });
 
-  const adminId = insertUser({ email: 'admin@loadbyton.ae', role: 'ADMIN', tier: 'GOLD', referral_code: 'ADM-LOADBYTON', is_verified: true });
-  insertProfile(adminId, { company: 'Loadbyton Ops', phone: '+971 4 000 1000' });
+  // F1 (gstack review): a publicly-known admin@loadbyton.ae/demo1234 account
+  // was seeded unconditionally, including in production — admin can decrypt
+  // carrier IBAN/TRN, impersonate any user, release escrow, and resolve
+  // disputes, so that credential must never exist on a real deployment by
+  // default. Every other demo account stays seeded everywhere (including
+  // production) — the live site is an intentional public demo for the
+  // shipper/carrier experience (see the footer disclosure); only the admin
+  // account is gated. Set SEED_DEMO_ADMIN=1 to opt back in (e.g. a private
+  // staging environment that needs to exercise the admin console).
+  const seedAdmin = process.env.NODE_ENV !== 'production' || process.env.SEED_DEMO_ADMIN === '1';
+  if (seedAdmin) {
+    const adminId = insertUser({ email: 'admin@loadbyton.ae', role: 'ADMIN', tier: 'GOLD', referral_code: 'ADM-LOADBYTON', is_verified: true });
+    insertProfile(adminId, { company: 'Loadbyton Ops', phone: '+971 4 000 1000' });
+  } else {
+    console.log('Loadbyton: skipping demo ADMIN seed in production (set SEED_DEMO_ADMIN=1 to override).');
+  }
 
   // --- Jobs --------------------------------------------------------------
   function insertJob(j) {
@@ -263,5 +283,5 @@ module.exports = function seed() {
   auditRow.run(null, 'ESCROW_RELEASE', 'Auto-released LBT-DXB-2607-9042 after 24h (silent assent).', 'job', job5, 'HELD', 'RELEASED');
   auditRow.run(shipperId, 'STATUS', 'LBT-DXB-2607-7715: DELIVERED -> COMPLETED', 'job', job6, 'DELIVERED', 'COMPLETED');
 
-  console.log('Loadbyton: seeded demo data (6 users, 6 jobs, 7 bids, templates, contract lanes).');
+  console.log(`Loadbyton: seeded demo data (${seedAdmin ? 6 : 5} users, 6 jobs, 7 bids, templates, contract lanes).`);
 };

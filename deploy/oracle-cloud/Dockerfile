@@ -21,6 +21,15 @@ COPY --from=build /app/web/dist ./web/dist
 # DB_PATH must point inside it or every container restart loses the DB,
 # same failure mode this deploy path exists to fix.
 RUN mkdir -p /data
+
+# F21 (gstack review): ran as root by default — a container escape or a
+# dependency RCE would land as root on the host's container runtime for no
+# reason this app needs. node:22-slim ships a non-root `node` user (uid
+# 1000) already; just use it. Chown before switching USER since root owns
+# everything COPY'd/mkdir'd above.
+RUN chown -R node:node /app /data
+USER node
+
 ENV DB_PATH=/data/loadbyton.db
 ENV PORT=4000
 EXPOSE 4000
