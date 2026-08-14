@@ -8,6 +8,12 @@
   explicit choice, prefers-color-scheme. See docs/brand/BRAND_GUIDELINES.md.
 */
 :root {
+  --lb-ink-950: #0A0A0B;
+  --lb-ink-900: #111113;
+  --lb-ink-800: #1C1C1F;
+  --lb-ink-700: #2A2A2E;
+  --lb-ink-600: #3D3D42;
+
   --lb-navy-950: #0A0E17;
   --lb-navy-900: #0F172A;
   --lb-navy-800: #132043;
@@ -20,6 +26,12 @@
   --lb-blue-300: #93C5FD;
   --lb-blue-100: #DBEAFE;
   --lb-blue-50: #EFF6FF;
+
+  --lb-orange-700: #C2410C;
+  --lb-orange-600: #F2600C;
+  --lb-orange-500: #FF7A33;
+  --lb-orange-200: #FFD3B0;
+  --lb-orange-100: #FFE8D6;
 
   --lb-amber-700: #B45309;
   --lb-amber-600: #D97706;
@@ -43,35 +55,36 @@
   --lb-red-500: #EF4444;
   --lb-red-100: #FEE2E2;
 
-  --lb-radius-sm: 6px;
-  --lb-radius-md: 10px;
-  --lb-radius-lg: 14px;
-  --lb-radius-xl: 20px;
-  --lb-shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
-  --lb-shadow-md: 0 4px 16px rgba(15,23,42,0.10);
-  --lb-shadow-lg: 0 12px 32px rgba(15,23,42,0.16);
-  --lb-shadow-focus: 0 0 0 3px rgba(37,99,235,0.35);
+  --lb-radius-sm: 8px;
+  --lb-radius-md: 12px;
+  --lb-radius-lg: 16px;
+  --lb-radius-xl: 24px;
+  --lb-radius-full: 999px;
+  --lb-shadow-sm: 0 1px 2px rgba(10,10,11,0.06);
+  --lb-shadow-md: 0 6px 20px rgba(10,10,11,0.10);
+  --lb-shadow-lg: 0 16px 40px rgba(10,10,11,0.18);
+  --lb-shadow-focus: 0 0 0 3px rgba(242,96,12,0.35);
 
   --bg-canvas: var(--lb-slate-50);
   --bg-surface: var(--lb-slate-0);
   --bg-raised: var(--lb-slate-0);
-  --bg-inverse: var(--lb-navy-900);
+  --bg-inverse: var(--lb-ink-900);
 
   --border-default: var(--lb-slate-200);
   --border-subtle: var(--lb-slate-100);
   --border-strong: var(--lb-slate-300);
 
-  --text-primary: var(--lb-navy-900);
+  --text-primary: var(--lb-ink-900);
   --text-secondary: var(--lb-slate-700);
   --text-muted: var(--lb-slate-500);
   --text-inverse: var(--lb-slate-0);
-  --text-on-accent: var(--lb-navy-900);
+  --text-on-accent: var(--lb-slate-0);
 
-  --brand-primary: var(--lb-navy-600);
-  --brand-primary-hover: var(--lb-navy-700);
+  --brand-primary: var(--lb-ink-900);
+  --brand-primary-hover: var(--lb-ink-800);
   --brand-secondary: var(--lb-blue-500);
-  --brand-accent: var(--lb-amber-600);
-  --brand-accent-hover: var(--lb-amber-700);
+  --brand-accent: var(--lb-orange-600);
+  --brand-accent-hover: var(--lb-orange-700);
 
   --status-success: var(--lb-teal-600);
   --status-success-bg: var(--lb-teal-100);
@@ -85,23 +98,23 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg-canvas: var(--lb-navy-950);
-    --bg-surface: var(--lb-navy-900);
-    --bg-raised: var(--lb-navy-800);
+    --bg-canvas: var(--lb-ink-950);
+    --bg-surface: var(--lb-ink-900);
+    --bg-raised: var(--lb-ink-800);
     --bg-inverse: var(--lb-slate-50);
-    --border-default: var(--lb-navy-700);
-    --border-subtle: var(--lb-navy-800);
-    --border-strong: var(--lb-navy-600);
+    --border-default: var(--lb-ink-700);
+    --border-subtle: var(--lb-ink-800);
+    --border-strong: var(--lb-ink-600);
     --text-primary: var(--lb-slate-50);
     --text-secondary: var(--lb-slate-300);
     --text-muted: var(--lb-slate-500);
-    --text-inverse: var(--lb-navy-900);
-    --text-on-accent: var(--lb-navy-900);
-    --brand-primary: var(--lb-blue-500);
-    --brand-primary-hover: var(--lb-blue-300);
+    --text-inverse: var(--lb-ink-900);
+    --text-on-accent: var(--lb-ink-900);
+    --brand-primary: var(--lb-slate-50);
+    --brand-primary-hover: var(--lb-slate-200);
     --brand-secondary: var(--lb-blue-300);
-    --brand-accent: var(--lb-amber-500);
-    --brand-accent-hover: var(--lb-amber-200);
+    --brand-accent: var(--lb-orange-500);
+    --brand-accent-hover: #FFA05C;
     --status-success: var(--lb-teal-500);
     --status-success-bg: #123832;
     --status-warning: var(--lb-amber-500);
@@ -114,23 +127,23 @@
 }
 
 :root[data-theme="dark"] {
-  --bg-canvas: var(--lb-navy-950);
-  --bg-surface: var(--lb-navy-900);
-  --bg-raised: var(--lb-navy-800);
+  --bg-canvas: var(--lb-ink-950);
+  --bg-surface: var(--lb-ink-900);
+  --bg-raised: var(--lb-ink-800);
   --bg-inverse: var(--lb-slate-50);
-  --border-default: var(--lb-navy-700);
-  --border-subtle: var(--lb-navy-800);
-  --border-strong: var(--lb-navy-600);
+  --border-default: var(--lb-ink-700);
+  --border-subtle: var(--lb-ink-800);
+  --border-strong: var(--lb-ink-600);
   --text-primary: var(--lb-slate-50);
   --text-secondary: var(--lb-slate-300);
   --text-muted: var(--lb-slate-500);
-  --text-inverse: var(--lb-navy-900);
-  --text-on-accent: var(--lb-navy-900);
-  --brand-primary: var(--lb-blue-500);
-  --brand-primary-hover: var(--lb-blue-300);
+  --text-inverse: var(--lb-ink-900);
+  --text-on-accent: var(--lb-ink-900);
+  --brand-primary: var(--lb-slate-50);
+  --brand-primary-hover: var(--lb-slate-200);
   --brand-secondary: var(--lb-blue-300);
-  --brand-accent: var(--lb-amber-500);
-  --brand-accent-hover: var(--lb-amber-200);
+  --brand-accent: var(--lb-orange-500);
+  --brand-accent-hover: #FFA05C;
   --status-success: var(--lb-teal-500);
   --status-success-bg: #123832;
   --status-warning: var(--lb-amber-500);
@@ -254,8 +267,19 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
   }
 
   .card {
-    @apply rounded-lg border bg-surface shadow-sm transition-shadow duration-300 ease-out;
-    border-color: var(--border-default);
+    @apply rounded-lg bg-surface shadow-sm transition-shadow duration-300 ease-out;
+    border: 1px solid var(--border-subtle);
+  }
+
+  /* Elevation, not hairlines, is the primary way interactive surfaces read as
+     "raised" in this system (the ride-hailing-app school, not the enterprise-
+     SaaS-border school) — pair with hover:shadow-md in JSX for anything
+     clickable, the way OpenLoads' job cards already do. */
+  .card-interactive {
+    @apply card transition-shadow duration-150;
+  }
+  .card-interactive:hover {
+    box-shadow: var(--lb-shadow-md);
   }
   /* Opt-in — only cards meant to read as interactive (a whole card that's a
      link/button, not a form panel) get the lift. Applied via .card-hover in
@@ -270,7 +294,7 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-bold
       transition-[transform,background-color,box-shadow,border-color] duration-200 ease-out
       active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap;
   }
@@ -294,7 +318,7 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
   .btn-secondary:hover { background: var(--bg-raised); }
 
   .btn-ghost {
-    @apply btn text-ink-secondary;
+    @apply btn text-ink-secondary font-semibold;
   }
   .btn-ghost:hover { background: var(--bg-raised); color: var(--text-primary); }
 
@@ -313,7 +337,7 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
   .btn-success:hover { filter: brightness(0.92); }
 
   .btn-link {
-    @apply inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary underline-offset-2;
+    @apply inline-flex items-center gap-1.5 text-sm font-medium text-brand-secondary underline-offset-2;
     padding: 0;
     background: none;
   }
@@ -323,14 +347,18 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
     @apply px-3 py-1.5 text-xs;
   }
   .btn-lg {
-    @apply px-6 py-3 text-base;
+    @apply px-6 py-3 text-base rounded-full;
   }
 
-  .input {
+  .input,
+  .textarea,
+  .select {
     @apply w-full rounded-md border bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted;
     border-color: var(--border-strong);
   }
-  .input:focus {
+  .input:focus,
+  .textarea:focus,
+  .select:focus {
     outline: none;
     box-shadow: var(--lb-shadow-focus);
     border-color: var(--brand-secondary);
@@ -345,10 +373,15 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
   }
 
   .nav-link {
-    @apply rounded-md px-3 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-raised hover:text-ink;
+    @apply rounded-full px-3.5 py-2 text-sm font-semibold text-ink-secondary transition-colors hover:bg-raised hover:text-ink;
   }
+  /* Filled pill, not a soft tint — the current page reads as a decision that
+     was made, not a hover state that happened to stick (the ride-hailing-app
+     tab-bar convention, not the enterprise-dashboard soft-highlight one). */
   .nav-link-active {
-    @apply nav-link text-ink bg-raised;
+    @apply rounded-full px-3.5 py-2 text-sm font-semibold;
+    background: var(--brand-primary);
+    color: var(--text-inverse);
   }
 
   .tabular {

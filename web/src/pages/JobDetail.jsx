@@ -358,7 +358,7 @@ function DocumentList({ documents, jobId, onAdd }) {
           {documents.map((d) => (
             <li key={d.id} className="flex items-center gap-2.5 text-sm">
               <IconFile size={15} className="text-ink-muted" />
-              <a href={d.file_url} target="_blank" rel="noreferrer" className="font-medium text-brand-primary hover:underline">{d.title}</a>
+              <a href={d.file_url} target="_blank" rel="noreferrer" className="font-medium text-brand-secondary hover:underline">{d.title}</a>
               <Badge color="neutral">{d.doc_type}</Badge>
             </li>
           ))}

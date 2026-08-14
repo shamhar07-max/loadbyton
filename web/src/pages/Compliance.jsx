@@ -19,7 +19,7 @@ export default function Compliance() {
           Loadbyton processes personal data — company contacts, TRN, IBAN, driver names and phone numbers — under
           the principles of the UAE's Federal Decree-Law No. 45 of 2021 on the Protection of Personal Data (PDPL):
           data is collected for a stated purpose, kept only as long as that purpose requires, and protected with
-          controls proportionate to its sensitivity (see the <a href="/security" className="text-brand-primary hover:underline">Security</a> page for what that means technically —
+          controls proportionate to its sensitivity (see the <a href="/security" className="text-brand-secondary hover:underline">Security</a> page for what that means technically —
           field-level encryption for IBAN/TRN specifically).
         </p>
         <p>

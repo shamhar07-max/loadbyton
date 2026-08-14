@@ -141,7 +141,7 @@ export default function Earnings() {
                   {filteredPayouts.map((p) => (
                     <tr key={p.id} className="border-b last:border-0 hover:bg-raised" style={{ borderColor: 'var(--border-subtle)' }}>
                       <td className="px-5 py-3 font-mono text-xs">
-                        <Link to={`/jobs/${p.job_id}`} className="text-brand-primary hover:underline">{p.job_code}</Link>
+                        <Link to={`/jobs/${p.job_id}`} className="text-brand-secondary hover:underline">{p.job_code}</Link>
                       </td>
                       <td className="tabular px-5 py-3 text-ink-secondary">{formatAED(p.gross_aed)}</td>
                       <td className="tabular px-5 py-3 text-ink-muted">−{formatAED(p.platform_fee_aed)}</td>
@@ -151,7 +151,7 @@ export default function Earnings() {
                       <td className="px-5 py-3 text-ink-muted">{formatDate(p.released_at)}</td>
                       <td className="px-5 py-3">
                         {invoiceByJob[p.job_id] ? (
-                          <a href={`/api/invoices/${invoiceByJob[p.job_id].id}`} target="_blank" rel="noreferrer" className="text-brand-primary hover:underline">
+                          <a href={`/api/invoices/${invoiceByJob[p.job_id].id}`} target="_blank" rel="noreferrer" className="text-brand-secondary hover:underline">
                             {invoiceByJob[p.job_id].invoice_number}
                           </a>
                         ) : (

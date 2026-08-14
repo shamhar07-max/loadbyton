@@ -69,7 +69,7 @@ export default function MyBids() {
                   {bids.map((b) => (
                     <tr key={b.id} className="border-b last:border-0 hover:bg-raised" style={{ borderColor: 'var(--border-subtle)' }}>
                       <td className="px-5 py-3">
-                        <Link to={`/jobs/${b.job_id}`} className="font-mono text-xs text-brand-primary hover:underline">{b.job_code}</Link>
+                        <Link to={`/jobs/${b.job_id}`} className="font-mono text-xs text-brand-secondary hover:underline">{b.job_code}</Link>
                       </td>
                       <td className="px-5 py-3 text-ink-secondary">{formatLabel(b.pickup_terminal)} → {formatLabel(b.delivery_area)}</td>
                       <td className="tabular px-5 py-3 text-ink-secondary">{formatAED(b.amount_aed)}</td>

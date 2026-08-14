@@ -63,7 +63,7 @@ export default function Login() {
         </form>
 
         <p className="mt-5 text-center text-sm text-ink-muted">
-          New to Loadbyton? <Link to="/register" className="font-medium text-brand-primary hover:underline">Create an account</Link>
+          New to Loadbyton? <Link to="/register" className="font-medium text-brand-secondary hover:underline">Create an account</Link>
         </p>
 
         <div className="mt-6 rounded-md border px-4 py-3 text-xs text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>

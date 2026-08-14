@@ -72,7 +72,7 @@ export default function OpenLoads() {
                 </div>
                 <div className="mt-4 flex items-center justify-between border-t pt-3" style={{ borderColor: 'var(--border-subtle)' }}>
                   <p className="tabular text-sm font-semibold text-ink">Budget up to {formatAED(j.max_budget_aed)}</p>
-                  <span className="inline-flex items-center gap-1 text-sm font-medium text-brand-primary">
+                  <span className="inline-flex items-center gap-1 text-sm font-medium text-brand-secondary">
                     Bid <IconChevronRight size={14} />
                   </span>
                 </div>

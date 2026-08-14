@@ -101,7 +101,7 @@ export default function Register() {
         </form>
 
         <p className="mt-5 text-center text-sm text-ink-muted">
-          Already have an account? <Link to="/login" className="font-medium text-brand-primary hover:underline">Log in</Link>
+          Already have an account? <Link to="/login" className="font-medium text-brand-secondary hover:underline">Log in</Link>
         </p>
       </Card>
     </div>

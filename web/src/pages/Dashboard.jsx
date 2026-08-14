@@ -260,7 +260,7 @@ export default function Dashboard() {
                         <td className="tabular px-5 py-3 text-ink-secondary">{formatAED(j.agreed_price_aed || j.max_budget_aed)}</td>
                         <td className="px-5 py-3 text-ink-secondary">{formatDate(j.deadline)}</td>
                         <td className="px-5 py-3 text-right">
-                          <Link to={`/jobs/${j.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-primary hover:underline">
+                          <Link to={`/jobs/${j.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-secondary hover:underline">
                             View <IconChevronRight size={14} />
                           </Link>
                         </td>

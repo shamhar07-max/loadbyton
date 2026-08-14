@@ -70,7 +70,7 @@ const BADGE_COLORS = {
   warning: { background: 'var(--status-warning-bg)', color: 'var(--status-warning)' },
   danger: { background: 'var(--status-danger-bg)', color: 'var(--status-danger)' },
   info: { background: 'var(--status-info-bg)', color: 'var(--status-info)' },
-  accent: { background: 'var(--lb-amber-100)', color: 'var(--brand-accent)' },
+  accent: { background: 'var(--lb-orange-100)', color: 'var(--brand-accent)' },
 };
 
 export function Badge({ color = 'neutral', dot = true, className, children }) {
@@ -148,8 +148,8 @@ export function EmptyState({ icon, title, description, action }) {
 export function Stat({ label, value, sub, tone = 'default' }) {
   return (
     <div className="card p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">{label}</p>
-      <p className={cx('tabular mt-1.5 font-display text-2xl font-semibold', tone === 'accent' ? 'text-brand-accent' : 'text-ink')}>{value}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
+      <p className={cx('tabular mt-1.5 font-display text-3xl font-bold tracking-tight', tone === 'accent' ? 'text-brand-accent' : 'text-ink')}>{value}</p>
       {sub && <p className="mt-1 text-xs text-ink-muted">{sub}</p>}
     </div>
   );

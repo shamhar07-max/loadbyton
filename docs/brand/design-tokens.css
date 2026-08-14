@@ -8,6 +8,17 @@
 
 :root {
   /* primitive: color */
+
+  /* ink — the brand chrome color (buttons, active nav, primary CTAs) in the
+     near-black + single-accent system. Replaces navy as brand.primary; navy
+     itself stays defined below only because a couple of surfaces (fixed-dark
+     CTA panels) deliberately never theme-swap — see BRAND_GUIDELINES.md §2. */
+  --lb-ink-950: #0A0A0B;
+  --lb-ink-900: #111113;
+  --lb-ink-800: #1C1C1F;
+  --lb-ink-700: #2A2A2E;
+  --lb-ink-600: #3D3D42;
+
   --lb-navy-950: #0A0E17;
   --lb-navy-900: #0F172A;
   --lb-navy-800: #132043;
@@ -20,6 +31,15 @@
   --lb-blue-300: #93C5FD;
   --lb-blue-100: #DBEAFE;
   --lb-blue-50:  #EFF6FF;
+
+  /* orange — the one accent. Reserved for the actions that matter (award a
+     bid, confirm delivery, the primary marketing CTA) and nothing else — see
+     the "single accent" discipline in BRAND_GUIDELINES.md §2. */
+  --lb-orange-700: #C2410C;
+  --lb-orange-600: #F2600C;
+  --lb-orange-500: #FF7A33;
+  --lb-orange-200: #FFD3B0;
+  --lb-orange-100: #FFE8D6;
 
   --lb-amber-700: #B45309;
   --lb-amber-600: #D97706;
@@ -55,38 +75,39 @@
   --lb-font-body: 'Inter', ui-sans-serif, sans-serif;
   --lb-font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  /* primitive: radius / shadow */
-  --lb-radius-sm: 6px;
-  --lb-radius-md: 10px;
-  --lb-radius-lg: 14px;
-  --lb-radius-xl: 20px;
+  /* primitive: radius / shadow — bumped rounder and more shadow-led than the
+     old navy system (elevation over hairlines, per BRAND_GUIDELINES.md §2). */
+  --lb-radius-sm: 8px;
+  --lb-radius-md: 12px;
+  --lb-radius-lg: 16px;
+  --lb-radius-xl: 24px;
   --lb-radius-full: 999px;
-  --lb-shadow-sm: 0 1px 2px rgba(15,23,42,0.06);
-  --lb-shadow-md: 0 4px 16px rgba(15,23,42,0.10);
-  --lb-shadow-lg: 0 12px 32px rgba(15,23,42,0.16);
-  --lb-shadow-focus: 0 0 0 3px rgba(37,99,235,0.35);
+  --lb-shadow-sm: 0 1px 2px rgba(10,10,11,0.06);
+  --lb-shadow-md: 0 6px 20px rgba(10,10,11,0.10);
+  --lb-shadow-lg: 0 16px 40px rgba(10,10,11,0.18);
+  --lb-shadow-focus: 0 0 0 3px rgba(242,96,12,0.35);
 
   /* semantic: light theme (default) */
   --bg-canvas: var(--lb-slate-50);
   --bg-surface: var(--lb-slate-0);
   --bg-raised: var(--lb-slate-0);
-  --bg-inverse: var(--lb-navy-900);
+  --bg-inverse: var(--lb-ink-900);
 
   --border-default: var(--lb-slate-200);
   --border-subtle: var(--lb-slate-100);
   --border-strong: var(--lb-slate-300);
 
-  --text-primary: var(--lb-navy-900);
+  --text-primary: var(--lb-ink-900);
   --text-secondary: var(--lb-slate-700);
   --text-muted: var(--lb-slate-500);
   --text-inverse: var(--lb-slate-0);
-  --text-on-accent: var(--lb-navy-900);
+  --text-on-accent: var(--lb-slate-0);
 
-  --brand-primary: var(--lb-navy-600);
-  --brand-primary-hover: var(--lb-navy-700);
+  --brand-primary: var(--lb-ink-900);
+  --brand-primary-hover: var(--lb-ink-800);
   --brand-secondary: var(--lb-blue-500);
-  --brand-accent: var(--lb-amber-600);
-  --brand-accent-hover: var(--lb-amber-700);
+  --brand-accent: var(--lb-orange-600);
+  --brand-accent-hover: var(--lb-orange-700);
 
   --status-success: var(--lb-teal-600);
   --status-success-bg: var(--lb-teal-100);
@@ -100,26 +121,26 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg-canvas: var(--lb-navy-950);
-    --bg-surface: var(--lb-navy-900);
-    --bg-raised: var(--lb-navy-800);
+    --bg-canvas: var(--lb-ink-950);
+    --bg-surface: var(--lb-ink-900);
+    --bg-raised: var(--lb-ink-800);
     --bg-inverse: var(--lb-slate-50);
 
-    --border-default: var(--lb-navy-700);
-    --border-subtle: var(--lb-navy-800);
-    --border-strong: var(--lb-navy-600);
+    --border-default: var(--lb-ink-700);
+    --border-subtle: var(--lb-ink-800);
+    --border-strong: var(--lb-ink-600);
 
     --text-primary: var(--lb-slate-50);
     --text-secondary: var(--lb-slate-300);
     --text-muted: var(--lb-slate-500);
-    --text-inverse: var(--lb-navy-900);
-    --text-on-accent: var(--lb-navy-900);
+    --text-inverse: var(--lb-ink-900);
+    --text-on-accent: var(--lb-ink-900);
 
-    --brand-primary: var(--lb-blue-500);
-    --brand-primary-hover: var(--lb-blue-300);
+    --brand-primary: var(--lb-slate-50);
+    --brand-primary-hover: var(--lb-slate-200);
     --brand-secondary: var(--lb-blue-300);
-    --brand-accent: var(--lb-amber-500);
-    --brand-accent-hover: var(--lb-amber-200);
+    --brand-accent: var(--lb-orange-500);
+    --brand-accent-hover: #FFA05C;
 
     --status-success: var(--lb-teal-500);
     --status-success-bg: #123832;
@@ -133,26 +154,26 @@
 }
 
 :root[data-theme="dark"] {
-  --bg-canvas: var(--lb-navy-950);
-  --bg-surface: var(--lb-navy-900);
-  --bg-raised: var(--lb-navy-800);
+  --bg-canvas: var(--lb-ink-950);
+  --bg-surface: var(--lb-ink-900);
+  --bg-raised: var(--lb-ink-800);
   --bg-inverse: var(--lb-slate-50);
 
-  --border-default: var(--lb-navy-700);
-  --border-subtle: var(--lb-navy-800);
-  --border-strong: var(--lb-navy-600);
+  --border-default: var(--lb-ink-700);
+  --border-subtle: var(--lb-ink-800);
+  --border-strong: var(--lb-ink-600);
 
   --text-primary: var(--lb-slate-50);
   --text-secondary: var(--lb-slate-300);
   --text-muted: var(--lb-slate-500);
-  --text-inverse: var(--lb-navy-900);
-  --text-on-accent: var(--lb-navy-900);
+  --text-inverse: var(--lb-ink-900);
+  --text-on-accent: var(--lb-ink-900);
 
-  --brand-primary: var(--lb-blue-500);
-  --brand-primary-hover: var(--lb-blue-300);
+  --brand-primary: var(--lb-slate-50);
+  --brand-primary-hover: var(--lb-slate-200);
   --brand-secondary: var(--lb-blue-300);
-  --brand-accent: var(--lb-amber-500);
-  --brand-accent-hover: var(--lb-amber-200);
+  --brand-accent: var(--lb-orange-500);
+  --brand-accent-hover: #FFA05C;
 
   --status-success: var(--lb-teal-500);
   --status-success-bg: #123832;

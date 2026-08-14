@@ -39,10 +39,10 @@ export default function Landing() {
               {t('landing.hero.subtitle')}
             </p>
             <div className="animate-hero-in mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: '160ms' }}>
-              <Link to="/register" className="btn-accent px-6 py-3 text-base">
+              <Link to="/register" className="btn-accent rounded-full px-6 py-3 text-base">
                 {t('landing.hero.ctaShipper')} <IconArrowRight size={18} />
               </Link>
-              <Link to="/register?role=CARRIER" className="btn-secondary px-6 py-3 text-base">
+              <Link to="/register?role=CARRIER" className="btn-secondary rounded-full px-6 py-3 text-base">
                 {t('landing.hero.ctaCarrier')}
               </Link>
             </div>
@@ -54,10 +54,10 @@ export default function Landing() {
           </div>
 
           <div className="animate-hero-in flex items-center" style={{ animationDelay: '120ms' }}>
-            <div className="w-full overflow-hidden rounded-xl border shadow-lg transition-shadow duration-500 hover:shadow-xl" style={{ borderColor: 'var(--border-default)', background: 'var(--lb-navy-900)' }}>
+            <div className="w-full overflow-hidden rounded-xl border shadow-lg transition-shadow duration-500 hover:shadow-xl" style={{ borderColor: 'var(--border-default)', background: 'var(--lb-ink-900)' }}>
               <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
                 <p className="font-display text-sm font-semibold text-white">Lane Index — live</p>
-                <span className="badge" style={{ background: 'rgba(217,119,6,0.18)', color: '#F0B06B' }}>Public data</span>
+                <span className="badge" style={{ background: 'rgba(242,96,12,0.2)', color: 'var(--lb-orange-500)' }}>Public data</span>
               </div>
               <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
                 {(lanes.length ? lanes : Array.from({ length: 5 })).map((lane, i) => (
@@ -66,7 +66,7 @@ export default function Landing() {
                       <p className="truncate font-medium text-white">{lane ? `${formatLabel(lane.terminal)} → ${formatLabel(lane.area)}` : 'Loading…'}</p>
                       <p className="tabular text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{lane ? `${lane.distanceKm} km · ${lane.onTimePct}% on-time` : ''}</p>
                     </div>
-                    <p className="tabular font-display text-sm font-semibold" style={{ color: '#F0B06B' }}>{lane ? `AED ${lane.basePriceAed}` : ''}</p>
+                    <p className="tabular font-display text-sm font-semibold" style={{ color: 'var(--lb-orange-500)' }}>{lane ? `AED ${lane.basePriceAed}` : ''}</p>
                   </div>
                 ))}
               </div>
@@ -167,7 +167,7 @@ export default function Landing() {
               <p className="font-display text-xl font-semibold text-ink">Moving 10 containers, or need 5 trucks for one job?</p>
               <p className="mt-1 max-w-lg text-sm text-ink-muted">Post it as a single volume inquiry — state the container count or truck count once, and a carrier bids to cover the whole batch.</p>
             </div>
-            <Link to="/register" className="btn-secondary shrink-0 px-6 py-3 text-base">
+            <Link to="/register" className="btn-secondary shrink-0 rounded-full px-6 py-3 text-base">
               Post a volume inquiry <IconArrowRight size={18} />
             </Link>
           </Reveal>
@@ -188,7 +188,7 @@ export default function Landing() {
               <Reveal key={c?.id || i} delay={(i % 4) * 60} className="card card-hover p-5">
                 <div className="flex items-start justify-between">
                   <p className="font-display text-sm font-semibold text-ink">{c?.name || 'Loading…'}</p>
-                  <span className="badge" style={{ background: 'var(--lb-amber-100)', color: 'var(--brand-accent)' }}>{c?.tier}</span>
+                  <span className="badge" style={{ background: 'var(--lb-orange-100)', color: 'var(--brand-accent)' }}>{c?.tier}</span>
                 </div>
                 <p className="mt-2 flex items-center gap-1 text-sm text-ink-secondary">
                   <IconStar size={14} style={{ color: 'var(--brand-accent)' }} /> {c?.rating?.toFixed?.(2) ?? '—'} · {c?.completedJobs ?? 0} jobs
@@ -203,12 +203,12 @@ export default function Landing() {
       {/* CTA band */}
       <section className="py-16">
         <div className="container-page">
-          <Reveal className="flex flex-col items-start justify-between gap-6 rounded-xl px-8 py-10 sm:flex-row sm:items-center" style={{ background: 'var(--lb-navy-900)' }}>
+          <Reveal className="flex flex-col items-start justify-between gap-6 rounded-xl px-8 py-10 sm:flex-row sm:items-center" style={{ background: 'var(--lb-ink-900)' }}>
             <div>
               <p className="font-display text-xl font-semibold text-white">Your next shipment shouldn't be a re-negotiation.</p>
               <p className="mt-1 text-sm text-white/60">Save the lane once. Re-run it in two taps next time.</p>
             </div>
-            <Link to="/register" className="btn-accent px-6 py-3 text-base">
+            <Link to="/register" className="btn-accent rounded-full px-6 py-3 text-base">
               Get started free <IconArrowRight size={18} />
             </Link>
           </Reveal>

@@ -2,6 +2,13 @@
   "$schema": "loadbyton/design-tokens/v1",
   "primitive": {
     "color": {
+      "ink": {
+        "950": "#0A0A0B",
+        "900": "#111113",
+        "800": "#1C1C1F",
+        "700": "#2A2A2E",
+        "600": "#3D3D42"
+      },
       "navy": {
         "950": "#0A0E17",
         "900": "#0F172A",
@@ -16,6 +23,13 @@
         "300": "#93C5FD",
         "100": "#DBEAFE",
         "50": "#EFF6FF"
+      },
+      "orange": {
+        "700": "#C2410C",
+        "600": "#F2600C",
+        "500": "#FF7A33",
+        "200": "#FFD3B0",
+        "100": "#FFE8D6"
       },
       "amber": {
         "700": "#B45309",
@@ -53,27 +67,27 @@
       "leading": { "tight": 1.15, "snug": 1.35, "normal": 1.55, "relaxed": 1.7 }
     },
     "space": { "0": "0", "1": "4px", "2": "8px", "3": "12px", "4": "16px", "5": "20px", "6": "24px", "8": "32px", "10": "40px", "12": "48px", "16": "64px", "20": "80px", "24": "96px" },
-    "radius": { "sm": "6px", "md": "10px", "lg": "14px", "xl": "20px", "full": "999px" },
+    "radius": { "sm": "8px", "md": "12px", "lg": "16px", "xl": "24px", "full": "999px" },
     "shadow": {
-      "sm": "0 1px 2px rgba(15,23,42,0.06)",
-      "md": "0 4px 16px rgba(15,23,42,0.10)",
-      "lg": "0 12px 32px rgba(15,23,42,0.16)",
-      "focus": "0 0 0 3px rgba(37,99,235,0.35)"
+      "sm": "0 1px 2px rgba(10,10,11,0.06)",
+      "md": "0 6px 20px rgba(10,10,11,0.10)",
+      "lg": "0 16px 40px rgba(10,10,11,0.18)",
+      "focus": "0 0 0 3px rgba(242,96,12,0.35)"
     }
   },
   "semantic": {
     "light": {
-      "bg": { "canvas": "{slate.50}", "surface": "{slate.0}", "raised": "{slate.0}", "inverse": "{navy.900}" },
+      "bg": { "canvas": "{slate.50}", "surface": "{slate.0}", "raised": "{slate.0}", "inverse": "{ink.900}" },
       "border": { "default": "{slate.200}", "subtle": "{slate.100}", "strong": "{slate.300}" },
-      "text": { "primary": "{navy.900}", "secondary": "{slate.700}", "muted": "{slate.500}", "inverse": "{slate.0}", "onAccent": "{navy.900}" },
-      "brand": { "primary": "{navy.600}", "primaryHover": "{navy.700}", "secondary": "{blue.500}", "accent": "{amber.600}", "accentHover": "{amber.700}" },
+      "text": { "primary": "{ink.900}", "secondary": "{slate.700}", "muted": "{slate.500}", "inverse": "{slate.0}", "onAccent": "{slate.0}" },
+      "brand": { "primary": "{ink.900}", "primaryHover": "{ink.800}", "secondary": "{blue.500}", "accent": "{orange.600}", "accentHover": "{orange.700}" },
       "status": { "success": "{teal.600}", "successBg": "{teal.100}", "warning": "{amber.600}", "warningBg": "{amber.100}", "danger": "{red.600}", "dangerBg": "{red.100}", "info": "{blue.600}", "infoBg": "{blue.50}" }
     },
     "dark": {
-      "bg": { "canvas": "{navy.950}", "surface": "{navy.900}", "raised": "{navy.800}", "inverse": "{slate.50}" },
-      "border": { "default": "{navy.700}", "subtle": "{navy.800}", "strong": "{navy.600}" },
-      "text": { "primary": "{slate.50}", "secondary": "{slate.300}", "muted": "{slate.500}", "inverse": "{navy.900}", "onAccent": "{navy.900}" },
-      "brand": { "primary": "{blue.500}", "primaryHover": "{blue.300}", "secondary": "{blue.300}", "accent": "{amber.500}", "accentHover": "{amber.200}" },
+      "bg": { "canvas": "{ink.950}", "surface": "{ink.900}", "raised": "{ink.800}", "inverse": "{slate.50}" },
+      "border": { "default": "{ink.700}", "subtle": "{ink.800}", "strong": "{ink.600}" },
+      "text": { "primary": "{slate.50}", "secondary": "{slate.300}", "muted": "{slate.500}", "inverse": "{ink.900}", "onAccent": "{ink.900}" },
+      "brand": { "primary": "{slate.50}", "primaryHover": "{slate.200}", "secondary": "{blue.300}", "accent": "{orange.500}", "accentHover": "#FFA05C" },
       "status": { "success": "{teal.500}", "successBg": "#123832", "warning": "{amber.500}", "warningBg": "#3A2A10", "danger": "#F87171", "dangerBg": "#3A1616", "info": "{blue.300}", "infoBg": "#122540" }
     }
   },
