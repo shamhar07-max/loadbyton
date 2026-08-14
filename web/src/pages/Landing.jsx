@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { formatLabel, TERMINALS, TERMINAL_INFO, EQUIPMENT_TYPES, equipmentLabel } from '../lib/constants.js';
+import { formatLabel, EQUIPMENT_TYPES, equipmentLabel } from '../lib/constants.js';
 import { usePageTitle } from '../lib/seo.jsx';
 import { useLocale } from '../lib/i18n.jsx';
 import { Reveal } from '../components/Reveal.jsx';
-import { IconShield, IconClock, IconMapPin, IconArrowRight, IconStar, IconTruck, IconPackage, IconTrailer, IconLayers, IconCompass } from '../components/icons.jsx';
+import { IconShield, IconClock, IconArrowRight, IconStar, IconTruck, IconPackage, IconTrailer, IconLayers, IconCompass } from '../components/icons.jsx';
 
 const EQUIPMENT_ICONS = {
   CONTAINER_CHASSIS: IconPackage, REEFER_TRUCK: IconPackage, LOWBED_TRAILER: IconTrailer, FLATBED_TRAILER: IconTrailer,
@@ -31,6 +31,7 @@ export default function Landing() {
   const [lanes, setLanes] = useState([]);
   const [carriers, setCarriers] = useState([]);
   const [market, setMarket] = useState(null);
+  const [activeLane, setActiveLane] = useState(0);
   const [heroAnim] = useState(() => {
     if (skipHeroAnimOnce) {
       skipHeroAnimOnce = false;
@@ -44,6 +45,18 @@ export default function Landing() {
     api.publicCarriers().then((d) => setCarriers(d.carriers.slice(0, 4))).catch(() => {});
     api.publicMarket().then((d) => setMarket(d.market)).catch(() => {});
   }, []);
+
+  // Auto-advances the lane spotlight — paused implicitly whenever the user
+  // has already interacted (clicked a bar), since that just re-seeds this
+  // same interval rather than fighting it.
+  useEffect(() => {
+    if (!lanes.length) return;
+    const id = setInterval(() => setActiveLane((i) => (i + 1) % lanes.length), 3500);
+    return () => clearInterval(id);
+  }, [lanes.length]);
+
+  const spotlight = lanes[activeLane];
+  const maxLanePrice = Math.max(1, ...lanes.map((l) => l.basePriceAed));
 
   return (
     <div>
@@ -75,20 +88,62 @@ export default function Landing() {
           <div className={`${heroAnim} flex items-center`} style={{ animationDelay: '120ms' }}>
             <div className="w-full overflow-hidden rounded-xl border shadow-lg transition-shadow duration-500 hover:shadow-xl" style={{ borderColor: 'var(--border-default)', background: 'var(--lb-ink-900)' }}>
               <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                <p className="font-display text-sm font-semibold text-white">Lane Index — live</p>
+                <p className="flex items-center gap-2 font-display text-sm font-semibold text-white">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ background: 'var(--lb-orange-500)' }} />
+                    <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: 'var(--lb-orange-500)' }} />
+                  </span>
+                  Lane Index — live
+                </p>
                 <span className="badge" style={{ background: 'rgba(242,96,12,0.2)', color: 'var(--lb-orange-500)' }}>Public data</span>
               </div>
-              <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                {(lanes.length ? lanes : Array.from({ length: 5 })).map((lane, i) => (
-                  <div key={i} className="flex items-center justify-between px-5 py-3 text-sm" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-white">{lane ? `${formatLabel(lane.terminal)} → ${formatLabel(lane.area)}` : 'Loading…'}</p>
-                      <p className="tabular text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{lane ? `${lane.distanceKm} km · ${lane.onTimePct}% on-time` : ''}</p>
+
+              {/* Spotlight — one lane at a time, large type, auto-rotating.
+                  A price list of five identical rows was flat; a single
+                  focal lane that changes reads as alive without inventing
+                  data that isn't real. */}
+              <div className="px-5 py-6">
+                {spotlight ? (
+                  <div key={activeLane} className="animate-panel-in">
+                    <p className="truncate font-display text-lg font-semibold text-white">
+                      {formatLabel(spotlight.terminal)} <span style={{ color: 'rgba(255,255,255,0.4)' }}>→</span> {formatLabel(spotlight.area)}
+                    </p>
+                    <div className="mt-3 flex items-end justify-between">
+                      <p className="tabular font-display text-3xl font-bold" style={{ color: 'var(--lb-orange-500)' }}>AED {spotlight.basePriceAed}</p>
+                      <div className="text-right">
+                        <p className="tabular text-sm font-semibold text-white">{spotlight.onTimePct}% on-time</p>
+                        <p className="tabular text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{spotlight.distanceKm} km</p>
+                      </div>
                     </div>
-                    <p className="tabular font-display text-sm font-semibold" style={{ color: 'var(--lb-orange-500)' }}>{lane ? `AED ${lane.basePriceAed}` : ''}</p>
                   </div>
-                ))}
+                ) : (
+                  <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>Loading…</p>
+                )}
+
+                {/* Mini comparison bars — click to jump the spotlight; this is
+                    the same five lanes as one glance-able chart instead of a
+                    repeated list. */}
+                <div className="mt-5 space-y-1.5">
+                  {lanes.map((lane, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActiveLane(i)}
+                      className="group flex w-full items-center gap-2 rounded-md py-0.5 text-left transition-opacity"
+                      style={{ opacity: i === activeLane ? 1 : 0.55 }}
+                      aria-label={`Show ${formatLabel(lane.terminal)} to ${formatLabel(lane.area)}`}
+                    >
+                      <span className="w-16 shrink-0 truncate text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{formatLabel(lane.terminal)}</span>
+                      <span className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                        <span
+                          className="block h-full rounded-full transition-all duration-500 group-hover:opacity-90"
+                          style={{ width: `${Math.max(8, (lane.basePriceAed / maxLanePrice) * 100)}%`, background: i === activeLane ? 'var(--lb-orange-500)' : 'rgba(255,255,255,0.35)' }}
+                        />
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
+
               <div className="grid grid-cols-3 gap-px px-5 py-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
                 {[
                   ['Open loads now', market?.openJobsNow ?? '—'],
@@ -137,44 +192,50 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Equipment coverage — not just containers. */}
+      {/* Equipment coverage — not just containers. A scrolling strip, not a
+          12-card wall: the point is "we cover more than containers," not an
+          inventory listing every class by name. */}
       <section className="border-b py-16" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page">
-          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Every truck class. One platform.</Reveal>
-          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Container chassis, reefer, flatbed, curtain-side, tripper, side-loader, and four pickup tonnages — twelve equipment types, matched and priced the same way, every time.</Reveal>
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {EQUIPMENT_TYPES.map((t, i) => {
+          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Every truck class. <span style={{ color: 'var(--brand-accent)' }}>One platform.</span></Reveal>
+          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">From container chassis to ten-tonne pickups, matched and priced the same way, every time.</Reveal>
+        </div>
+        <Reveal delay={80} className="relative mt-8 overflow-hidden py-1" style={{ maskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)' }}>
+          <div className="animate-marquee flex w-max items-center gap-3">
+            {[...EQUIPMENT_TYPES, ...EQUIPMENT_TYPES].map((t, i) => {
               const EqIcon = EQUIPMENT_ICONS[t] || IconTruck;
               return (
-                <Reveal key={t} as={Link} to="/register" delay={(i % 4) * 50} className="card card-hover group flex items-center gap-3 p-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-transform duration-300 group-hover:scale-110" style={{ background: 'var(--bg-raised)', color: 'var(--brand-accent)' }}>
-                    <EqIcon size={18} />
-                  </div>
-                  <p className="text-sm font-medium text-ink">{equipmentLabel(t)}</p>
-                </Reveal>
+                <span key={i} className="flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium text-ink-secondary" style={{ borderColor: 'var(--border-default)' }}>
+                  <EqIcon size={16} style={{ color: 'var(--brand-accent)' }} /> {equipmentLabel(t)}
+                </span>
               );
             })}
           </div>
-        </div>
+        </Reveal>
       </section>
 
-      {/* UAE coverage — explicitly not Jebel-Ali-only. */}
+      {/* UAE coverage — explicitly not Jebel-Ali-only. A stat, not a roll
+          call of every terminal by name: the claim is "the whole UAE," and
+          three numbers make that case faster than six labeled cards do. */}
       <section className="border-b py-16" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page">
-          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Built for the whole UAE — not just Dubai.</Reveal>
-          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Six terminals, four emirates, one Lane Index. Post a job from Fujairah Port the same way you'd post one from Jebel Ali — same escrow, same bidding, same rules.</Reveal>
-          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {TERMINALS.map((t, i) => (
-              <Reveal key={t} delay={(i % 3) * 60} className="card flex items-start gap-3 p-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md" style={{ background: 'var(--bg-raised)', color: 'var(--brand-accent)' }}>
-                  <IconMapPin size={18} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-ink">{formatLabel(t)}</p>
-                  <p className="text-xs text-ink-muted">{TERMINAL_INFO[t]?.emirate} · {TERMINAL_INFO[t]?.operator}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="grid items-center gap-8 lg:grid-cols-[1.1fr,0.9fr]">
+            <div>
+              <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Built for the whole UAE <span style={{ color: 'var(--brand-accent)' }}>— not just Dubai.</span></Reveal>
+              <Reveal as="p" delay={40} className="mt-2 max-w-md text-sm text-ink-muted">Post a job from Fujairah Port the same way you'd post one from Jebel Ali — same escrow, same bidding, same rules.</Reveal>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                ['4', 'Emirates'],
+                ['6', 'Terminals'],
+                ['1', 'Lane Index'],
+              ].map(([value, label], i) => (
+                <Reveal key={label} delay={i * 60} className="card p-4 text-center">
+                  <p className="tabular font-display text-3xl font-bold" style={{ color: 'var(--brand-accent)' }}>{value}</p>
+                  <p className="mt-1 text-xs font-medium text-ink-muted">{label}</p>
+                </Reveal>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -182,12 +243,21 @@ export default function Landing() {
       {/* Volume & enterprise CTA band */}
       <section className="border-b py-16" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page">
-          <Reveal className="flex flex-col items-start justify-between gap-6 rounded-xl border px-8 py-10 sm:flex-row sm:items-center" style={{ borderColor: 'var(--border-default)' }}>
-            <div>
-              <p className="font-display text-xl font-semibold text-ink">Ten containers or five trucks — one job, not ten conversations.</p>
+          <Reveal
+            className="group relative flex flex-col items-start justify-between gap-6 overflow-hidden rounded-2xl border px-8 py-10 transition-shadow duration-300 hover:shadow-lg sm:flex-row sm:items-center"
+            style={{ borderColor: 'var(--border-default)', background: 'linear-gradient(135deg, color-mix(in srgb, var(--brand-accent) 10%, var(--bg-surface)), var(--bg-surface) 65%)' }}
+          >
+            <IconLayers
+              size={150}
+              className="pointer-events-none absolute -right-6 -top-8 transition-transform duration-500 ease-out group-hover:-translate-y-1 group-hover:rotate-6"
+              style={{ color: 'var(--brand-accent)', opacity: 0.12 }}
+            />
+            <div className="relative">
+              <span className="badge" style={{ background: 'color-mix(in srgb, var(--brand-accent) 16%, transparent)', color: 'var(--brand-accent)' }}>Volume inquiry</span>
+              <p className="mt-3 font-display text-xl font-semibold text-ink">Ten containers or five trucks — one job, not ten conversations.</p>
               <p className="mt-1 max-w-lg text-sm text-ink-muted">State the count once. Carriers bid to cover the whole batch at one agreed price — no unit-by-unit negotiation, no separate thread per truck.</p>
             </div>
-            <Link to="/register" className="btn-secondary shrink-0 rounded-full px-6 py-3 text-base">
+            <Link to="/register" className="btn-accent relative shrink-0 rounded-full px-6 py-3 text-base transition-transform duration-200 group-hover:scale-[1.03]">
               Post a volume inquiry <IconArrowRight size={18} />
             </Link>
           </Reveal>

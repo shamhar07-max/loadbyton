@@ -119,7 +119,7 @@ export function Shell({ children }) {
             </button>
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="nav-link"
+              className="nav-link hidden md:inline-flex"
               aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
             >
@@ -188,6 +188,13 @@ export function Shell({ children }) {
                   {item.label}
                 </NavLink>
               ))}
+              <button
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="nav-link flex items-center gap-2 text-left"
+              >
+                {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
+                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              </button>
               <button
                 onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}
                 className="nav-link text-left"
