@@ -13,6 +13,7 @@ const { unifiedLanes, estimateRate, optimizeRoute } = require('./lib/lanes');
 const { issueInvoice, renderInvoiceHtml } = require('./lib/invoice');
 const { rateLimiter, byIp } = require('./lib/rateLimit');
 const { encryptField, decryptField } = require('./lib/crypto');
+const { notifyDriverAsync } = require('./lib/whatsapp');
 const {
   cookieParser,
   requestId,
@@ -808,6 +809,16 @@ app.post('/api/jobs/:id/award', auth(['SHIPPER']), requireSeatRole(['OPS']), (re
     void payoutResult;
     db.exec('COMMIT');
     const job2 = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
+    // Driver messaging order per docs/STRATEGY.md is WhatsApp -> SMS -> in-app;
+    // in-app already fired above via notify() regardless of whether this
+    // sends. Fire-and-forget, after commit, never inside the transaction —
+    // see server/lib/whatsapp.js for why this safely no-ops until Meta
+    // approval lands (TODO-4).
+    notifyDriverAsync({
+      to: job2.assigned_driver_phone,
+      template: 'job_awarded_pickup_details',
+      params: [job2.assigned_driver_name || 'Driver', job2.job_code, job2.pickup_terminal],
+    });
     res.json({ ok: true, job: job2 });
   } catch (e) {
     try {

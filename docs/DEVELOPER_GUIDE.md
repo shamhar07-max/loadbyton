@@ -92,6 +92,7 @@ curl -s localhost:4000/api/public/lanes
 | `PLATFORM_TRN` | unset | Loadbyton's own TRN, printed on every commission tax invoice (`server/lib/invoice.js`). Invoices render a visible warning until this is set — never fabricate a placeholder TRN in production. |
 | `PLATFORM_LEGAL_NAME` | `Loadbyton` | Supplier legal name on tax invoices |
 | `ENCRYPTION_KEY` | none (required outside dev) | AES-256-GCM key for IBAN/TRN field encryption — see `server/lib/crypto.js` |
+| `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | unset | Enables driver WhatsApp messaging (`server/lib/whatsapp.js`); safely no-ops and logs until both are set — see `docs/WHATSAPP_SETUP.md` (TODO-4) |
 
 Platform settings (runtime, not env): `commission_rate_bps` (default 600) and `auto_release_hours` (default 24), editable by admin via `PATCH /api/admin/settings`.
 
