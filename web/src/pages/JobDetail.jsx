@@ -9,6 +9,13 @@ import { IconCheck, IconClock, IconMapPin, IconFile, IconMessage, IconStar, Icon
 import { useToasts } from '../components/Toast.jsx';
 import { fileToBase64, UPLOAD_ACCEPT, documentFileUrl } from '../lib/upload.js';
 import LocationPicker from '../components/LocationPicker.jsx';
+import ScanWithAi from '../components/ScanWithAi.jsx';
+
+const DOC_TYPES = ['CUSTOMS', 'RECEIPT', 'POD', 'LICENCE', 'INSURANCE', 'OTHER'];
+const DOC_SCAN_FIELDS = [
+  { key: 'title', description: 'A short descriptive title for this document, e.g. "Customs release form" or "Insurance certificate — Al Falah Insurance"' },
+  { key: 'docType', description: `Best guess at exactly one of: ${DOC_TYPES.join(', ')}` },
+];
 
 // Must match server/index.js's DISPUTABLE_STATUSES exactly — the server is
 // the authority (this is only so the button doesn't appear when the server
@@ -609,14 +616,26 @@ function DocumentList({ documents, jobId, onAdd }) {
           ))}
         </ul>
       )}
-      <form onSubmit={submit} className="mt-4 grid grid-cols-1 gap-2 border-t pt-4 sm:grid-cols-[110px,1fr,1fr,auto]" style={{ borderColor: 'var(--border-subtle)' }}>
-        <select className="input" value={docType} onChange={(e) => setDocType(e.target.value)}>
-          {['CUSTOMS', 'RECEIPT', 'POD', 'LICENCE', 'INSURANCE', 'OTHER'].map((t) => <option key={t}>{t}</option>)}
-        </select>
-        <Input placeholder="Title" required value={title} onChange={(e) => setTitle(e.target.value)} />
-        <input type="file" accept={UPLOAD_ACCEPT} required className="input" onChange={(e) => setFile(e.target.files[0] || null)} />
-        <Button type="submit" variant="secondary" loading={busy}>Add</Button>
-      </form>
+      <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
+        <ScanWithAi
+          label="Scan document to autofill title/type"
+          fields={DOC_SCAN_FIELDS}
+          onExtract={(extracted) => {
+            if (extracted.title) setTitle(extracted.title);
+            if (extracted.docType && DOC_TYPES.includes(extracted.docType.toUpperCase())) {
+              setDocType(extracted.docType.toUpperCase());
+            }
+          }}
+        />
+        <form onSubmit={submit} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[110px,1fr,1fr,auto]">
+          <select className="input" value={docType} onChange={(e) => setDocType(e.target.value)}>
+            {DOC_TYPES.map((t) => <option key={t}>{t}</option>)}
+          </select>
+          <Input placeholder="Title" required value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input type="file" accept={UPLOAD_ACCEPT} required className="input" onChange={(e) => setFile(e.target.files[0] || null)} />
+          <Button type="submit" variant="secondary" loading={busy}>Add</Button>
+        </form>
+      </div>
     </div>
   );
 }

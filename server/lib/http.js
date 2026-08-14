@@ -50,7 +50,11 @@ function securityHeaders(req, res, next) {
     // Nominatim map picker (web/src/components/LocationPicker.jsx) — tile
     // images load from *.tile.openstreetmap.org, and the browser calls
     // nominatim.openstreetmap.org directly for search/reverse-geocode.
-    "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self' https://nominatim.openstreetmap.org; frame-ancestors 'none'; base-uri 'self'"
+    // The *.puter.com carve-outs (script/connect/frame) are for Puter.js
+    // (web/src/lib/puterOcr.js) — the SDK script itself, its API calls, and
+    // its sign-in popup all need to be allowed for the "scan with AI"
+    // document-extraction helpers to work at all.
+    "default-src 'self'; img-src 'self' data: https://*.tile.openstreetmap.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self' https://*.puter.com; connect-src 'self' https://nominatim.openstreetmap.org https://*.puter.com wss://*.puter.com; frame-src https://*.puter.com; frame-ancestors 'none'; base-uri 'self'"
   );
   // Loadbyton never asks for any of these browser capabilities — deny them
   // outright rather than leaving the default (permissive) policy in place.
