@@ -111,10 +111,18 @@ function renderInvoiceHtml({ invoice, job, carrierProfile }) {
   .totals td{ font-weight:600; }
   .cols{ display:flex; justify-content:space-between; margin-top:20px; gap:24px; }
   .cols div{ flex:1; }
-  @media print { body{ margin:0; } }
+  .print-bar{ display:flex; justify-content:flex-end; margin-bottom:16px; }
+  .print-bar button{ font:600 13px Arial, sans-serif; padding:8px 16px; border-radius:6px; border:1px solid #16211f; background:#16211f; color:#fff; cursor:pointer; }
+  .print-bar button:hover{ opacity:0.85; }
+  @media print {
+    @page { margin: 16mm; }
+    body{ margin:0; max-width:none; }
+    .no-print{ display:none !important; }
+  }
 </style>
 </head>
 <body>
+  <div class="print-bar no-print"><button id="invoice-print-btn">Print / Save as PDF</button></div>
   ${trnWarning}
   <h1>Tax Invoice</h1>
   <p class="muted">Invoice ${esc(invoice.invoice_number)} · Issued ${esc(invoice.issued_at)}</p>
@@ -145,6 +153,7 @@ function renderInvoiceHtml({ invoice, job, carrierProfile }) {
     Freight amount (AED ${Number(invoice.gross_aed).toFixed(2)}) is a supply between shipper and
     carrier and is not part of this invoice — this invoice covers Loadbyton's commission only.
   </p>
+  <script src="/api/invoices/print.js"></script>
 </body>
 </html>`;
 }

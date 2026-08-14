@@ -83,6 +83,8 @@ The core entity.
 | `pickup_terminal` | TEXT NOT NULL | e.g. `JEBEL_ALI_T2` |
 | `delivery_area` | TEXT NOT NULL | e.g. `JAFZA_SOUTH` |
 | `delivery_address` | TEXT NOT NULL | |
+| `pickup_lat` / `pickup_lng` / `pickup_address_detail` | REAL / REAL / TEXT | Optional precise pin from the free OpenStreetMap+Nominatim picker, on top of `pickup_terminal` (which still drives lane rate lookups) |
+| `delivery_lat` / `delivery_lng` / `delivery_address_detail` | REAL / REAL / TEXT | Same, for the delivery point, on top of `delivery_address` |
 | `ready_at` | TEXT NOT NULL | ready-for-pickup time |
 | `deadline` | TEXT NOT NULL | |
 | `max_budget_aed` | REAL | shipper ceiling |
@@ -129,8 +131,14 @@ The persistent per-job document/customs thread.
 | `uploader_id` | INTEGER NOT NULL | FK → users |
 | `doc_type` | TEXT NOT NULL | `CUSTOMS`\|`RECEIPT`\|`POD`\|`LICENCE`\|`INSURANCE`\|`OTHER` |
 | `title` | TEXT NOT NULL | |
-| `file_url` | TEXT NOT NULL | |
+| `file_url` | TEXT NOT NULL | External URL (legacy/manual entry), or the local `storage_path` when uploaded through the app |
+| `storage_path` | TEXT | Set when the file was uploaded via `POST /api/jobs/:id/documents` or `/pod` (base64 body, decoded to `UPLOADS_DIR/<jobId>/<uuid>.<ext>`); NULL for a manually-entered external link |
+| `mime_type` | TEXT | Set alongside `storage_path`; one of the `ALLOWED_UPLOAD_MIME_TYPES` in `server/index.js` |
 | `created_at` | TEXT | |
+
+Uploaded files are served back through `GET /api/jobs/:id/documents/:docId/file`, which
+re-checks `isParticipantOrBidder` on every read — the same access rule every other
+job-scoped route uses — so a document is never reachable by a bare guessable URL.
 
 ### `messages`
 Per-job chat (contact gating lives in the API — PII stays hidden until award).

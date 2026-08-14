@@ -4,6 +4,12 @@ import { api } from '../lib/api.js';
 import { usePageTitle } from '../lib/seo.jsx';
 import { Button, Card, Input, Label, Select, Badge, EmptyState } from '../components/ui.jsx';
 import { IconUser } from '../components/icons.jsx';
+import ScanWithAi from '../components/ScanWithAi.jsx';
+
+const TRN_LICENCE_SCAN_FIELDS = [
+  { key: 'trnNumber', description: 'The UAE Tax Registration Number (TRN) — a 15-digit number, sometimes labelled "TRN" or "Tax Registration Number"' },
+  { key: 'tradeLicenseNumber', description: 'The trade licence / commercial licence number' },
+];
 
 const SEAT_ROLE_HELP = {
   OPS: 'Full day-to-day access — post jobs, bid, award, update status.',
@@ -196,6 +202,19 @@ export default function Profile() {
             <div>
               <Label>Trade licence number</Label>
               <Input value={form.tradeLicenseNumber} onChange={(e) => setForm({ ...form, tradeLicenseNumber: e.target.value })} />
+            </div>
+            <div className="sm:col-span-2">
+              <ScanWithAi
+                label="Scan TRN / trade licence photo to autofill"
+                fields={TRN_LICENCE_SCAN_FIELDS}
+                onExtract={(extracted) => {
+                  setForm((f) => ({
+                    ...f,
+                    trnNumber: extracted.trnNumber || f.trnNumber,
+                    tradeLicenseNumber: extracted.tradeLicenseNumber || f.tradeLicenseNumber,
+                  }));
+                }}
+              />
             </div>
             {user.role === 'CARRIER' && (
               <>

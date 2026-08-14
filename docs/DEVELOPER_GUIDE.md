@@ -96,6 +96,29 @@ curl -s localhost:4000/api/public/lanes
 
 Platform settings (runtime, not env): `commission_rate_bps` (default 600) and `auto_release_hours` (default 24), editable by admin via `PATCH /api/admin/settings`.
 
+## 7a. AI document extraction (Puter.js — no env var, no server config)
+
+"Scan with AI" buttons on Register/Profile (TRN + trade licence) and JobDetail's
+Documents section (`web/src/components/ScanWithAi.jsx`) extract structured fields
+from a photo of a document, entirely client-side via
+[Puter.js](https://js.puter.com/v2/) — loaded as a `<script defer>` in
+`web/index.html`. There is nothing to configure: Loadbyton never holds a
+vision-API key, and usage is billed to whichever Puter account the *browser
+user* signs into (a one-time popup) — see `web/src/lib/puterOcr.js`.
+
+- CSP (`server/lib/http.js`) carves out `https://*.puter.com` for
+  `script-src`/`connect-src`/`frame-src` — required for the SDK, its API
+  calls, and its sign-in popup respectively.
+- Extraction is always optional and non-authoritative: it only ever
+  prefills a form field or suggests a title/type for the human to review
+  before submitting — nothing server-side trusts or acts on it directly.
+- `waitForPuter()` in `puterOcr.js` times out after 10s with a clear,
+  in-UI error if `js.puter.com` is unreachable or slow; the rest of the app
+  (registration, profile, document upload) works completely normally
+  either way — this was verified by pointing the app at a network that
+  blocks `puter.com` entirely and confirming no crash, just a disabled
+  "Scan with AI" affordance.
+
 ## 8. Troubleshooting
 
 | Symptom | Cause / fix |

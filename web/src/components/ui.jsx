@@ -1,4 +1,5 @@
 import React from 'react';
+import { IconStar } from './icons.jsx';
 
 function cx(...parts) {
   return parts.filter(Boolean).join(' ');
@@ -98,6 +99,44 @@ export function EscrowBadge({ status }) {
   return <Badge color={ESCROW_COLOR[status] || 'neutral'}>Escrow: {status}</Badge>;
 }
 
+// ------------------------------------------------------------ RatingPill
+// Ratings previously only showed on the public carrier directory
+// (Landing.jsx) — a shipper picking between bids, or a carrier scanning
+// open loads, had no counterparty signal without opening the job. Renders
+// nothing for null/undefined (a shipper with zero ratings yet, or a job
+// with no carrier assigned) rather than a misleading "0.0".
+export function RatingPill({ rating, count, className }) {
+  if (rating === null || rating === undefined) return null;
+  return (
+    <span className={cx('inline-flex items-center gap-1 text-xs font-medium text-ink-secondary', className)}>
+      <IconStar size={12} style={{ color: 'var(--brand-accent)' }} />
+      {Number(rating).toFixed(1)}
+      {count !== undefined && count !== null && <span className="text-ink-muted">({count})</span>}
+    </span>
+  );
+}
+
+// ------------------------------------------------------------ Pagination
+// Real "page X of Y" pagination — the API previously had a limit/offset
+// ceiling with no way to see or reach a second page from the UI at all.
+export function Pagination({ total, limit, offset, onChange }) {
+  if (total <= limit) return null;
+  const page = Math.floor(offset / limit) + 1;
+  const pageCount = Math.max(1, Math.ceil(total / limit));
+  const from = total === 0 ? 0 : offset + 1;
+  const to = Math.min(total, offset + limit);
+  return (
+    <div className="mt-4 flex items-center justify-between text-sm text-ink-muted">
+      <span>Showing {from}–{to} of {total}</span>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => onChange(Math.max(0, offset - limit))}>Previous</Button>
+        <span className="tabular text-xs">Page {page} of {pageCount}</span>
+        <Button variant="ghost" size="sm" disabled={page >= pageCount} onClick={() => onChange(offset + limit)}>Next</Button>
+      </div>
+    </div>
+  );
+}
+
 // ----------------------------------------------------------------- Input
 export function Label({ className, children, ...props }) {
   return (
@@ -131,9 +170,9 @@ export function Spinner({ size = 20, className }) {
 }
 
 // ------------------------------------------------------------ EmptyState
-export function EmptyState({ icon, title, description, action }) {
+export function EmptyState({ icon, title, description, action, className }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-6 py-14 text-center" style={{ borderColor: 'var(--border-strong)' }}>
+    <div className={cx('flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-6 py-14 text-center', className)} style={{ borderColor: 'var(--border-strong)' }}>
       {icon && <div className="text-ink-muted">{icon}</div>}
       <div>
         <p className="font-display text-base font-semibold text-ink">{title}</p>

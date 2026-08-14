@@ -4,6 +4,12 @@ import { useAuth, roleHome } from '../lib/auth.jsx';
 import { Button, Input, Label, Card } from '../components/ui.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
 import { useLocale } from '../lib/i18n.jsx';
+import ScanWithAi from '../components/ScanWithAi.jsx';
+
+const TRN_LICENCE_SCAN_FIELDS = [
+  { key: 'trnNumber', description: 'The UAE Tax Registration Number (TRN) — a 15-digit number, sometimes labelled "TRN" or "Tax Registration Number"' },
+  { key: 'tradeLicenseNumber', description: 'The trade licence / commercial licence number' },
+];
 
 export default function Register() {
   usePageTitle('Create your account');
@@ -91,6 +97,17 @@ export default function Register() {
               <Input id="referral" value={form.referralCode} onChange={(e) => setForm({ ...form, referralCode: e.target.value })} placeholder="CAR-EMIRATES" />
             </div>
           </div>
+          <ScanWithAi
+            label="Scan TRN / trade licence photo to autofill"
+            fields={TRN_LICENCE_SCAN_FIELDS}
+            onExtract={(extracted) => {
+              setForm((f) => ({
+                ...f,
+                trnNumber: extracted.trnNumber || f.trnNumber,
+                tradeLicenseNumber: extracted.tradeLicenseNumber || f.tradeLicenseNumber,
+              }));
+            }}
+          />
           {role === 'CARRIER' && (
             <p className="rounded-md px-3 py-2 text-xs" style={{ background: 'var(--status-warning-bg)', color: 'var(--status-warning)' }}>
               New carrier accounts need admin verification (TRN, trade licence, insurance) before bidding — usually reviewed within a day.

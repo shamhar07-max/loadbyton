@@ -39,6 +39,14 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Puter.js: free, no-API-key browser access to GPT/Claude/Gemini
+         vision models — the signed-in Puter user's own free account covers
+         usage, not Loadbyton's. Used only for the optional "scan with AI"
+         document-extraction helpers (carrier TRN/trade licence, job
+         documents) in web/src/lib/puterOcr.js; the app works fully without
+         it if js.puter.com is ever unreachable — see waitForPuter's timeout
+         there. `defer` so it never blocks first paint. -->
+    <script src="https://js.puter.com/v2/" defer></script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
