@@ -190,6 +190,59 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
 }
 
 /* ------------------------------------------------------------------ */
+/* Motion system — two deliberately different mechanisms:              */
+/*   .animate-hero-in  — pure CSS @keyframes, no JS. Runs identically  */
+/*     whether client JS has loaded yet or not, so above-the-fold      */
+/*     content (the hero) never depends on a script executing to be    */
+/*     visible — including in the prerendered response a crawler sees. */
+/*   .reveal/.reveal-visible — paired with the useReveal() hook        */
+/*     (lib/motion.js), an IntersectionObserver flips the class. Only  */
+/*     used below the fold, where "hidden until scrolled to" is        */
+/*     correct, not a bug a slow script could turn into a blank page.  */
+/* Both durations collapse near-zero under prefers-reduced-motion via  */
+/* the block above — neither needs its own reduced-motion check.       */
+/* ------------------------------------------------------------------ */
+
+@keyframes hero-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-hero-in {
+  animation: hero-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Mount-triggered (not scroll-triggered) — dropdowns, mobile nav panel.
+   Plain CSS @keyframes again: these render the instant they mount, no
+   IntersectionObserver needed since there's no "off-screen until scrolled"
+   state for a menu that only exists while open. */
+@keyframes menu-in {
+  from { opacity: 0; transform: scale(0.97) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-menu-in {
+  animation: menu-in 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top right;
+}
+
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-panel-in {
+  animation: panel-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ------------------------------------------------------------------ */
 /* Component classes — in @layer components so plain Tailwind utility  */
 /* classes (hidden, w-full, sm:inline-flex, …) always win the cascade  */
 /* when combined with these, regardless of source order.               */
@@ -201,26 +254,38 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
   }
 
   .card {
-    @apply rounded-lg border bg-surface shadow-sm;
+    @apply rounded-lg border bg-surface shadow-sm transition-shadow duration-300 ease-out;
     border-color: var(--border-default);
+  }
+  /* Opt-in — only cards meant to read as interactive (a whole card that's a
+     link/button, not a form panel) get the lift. Applied via .card-hover in
+     the JSX, not baked into .card itself, so a settings panel doesn't lift
+     on hover for no reason. */
+  .card-hover {
+    @apply transition-[transform,box-shadow] duration-300 ease-out;
+  }
+  .card-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--lb-shadow-md);
   }
 
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold
-      transition-transform duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap;
+      transition-[transform,background-color,box-shadow,border-color] duration-200 ease-out
+      active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap;
   }
   .btn-primary {
     @apply btn text-ink-inverse;
     background: var(--brand-primary);
   }
-  .btn-primary:hover { background: var(--brand-primary-hover); }
+  .btn-primary:hover { background: var(--brand-primary-hover); box-shadow: var(--lb-shadow-md); transform: translateY(-1px); }
 
   .btn-accent {
     @apply btn;
     background: var(--brand-accent);
     color: var(--text-on-accent);
   }
-  .btn-accent:hover { background: var(--brand-accent-hover); }
+  .btn-accent:hover { background: var(--brand-accent-hover); box-shadow: var(--lb-shadow-md); transform: translateY(-1px); }
 
   .btn-secondary {
     @apply btn border bg-surface text-ink;

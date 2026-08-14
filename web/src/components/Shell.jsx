@@ -132,7 +132,7 @@ export function Shell({ children }) {
                     <span className="hidden text-sm font-medium sm:inline">{user.profile?.company_name || user.email}</span>
                   </button>
                   {menuOpen && (
-                    <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-lg border bg-surface shadow-lg" style={{ borderColor: 'var(--border-default)' }} onMouseLeave={() => setMenuOpen(false)}>
+                    <div className="animate-menu-in absolute right-0 mt-2 w-56 overflow-hidden rounded-lg border bg-surface shadow-lg" style={{ borderColor: 'var(--border-default)' }} onMouseLeave={() => setMenuOpen(false)}>
                       <div className="border-b px-4 py-3" style={{ borderColor: 'var(--border-default)' }}>
                         <p className="truncate text-sm font-medium text-ink">{actingAs ? actingAs.displayName || actingAs.email : user.email}</p>
                         <p className="text-xs text-ink-muted">
@@ -167,7 +167,7 @@ export function Shell({ children }) {
         </div>
 
         {mobileOpen && (
-          <nav className="border-t px-5 py-3 md:hidden" style={{ borderColor: 'var(--border-default)' }}>
+          <nav className="animate-panel-in border-t px-5 py-3 md:hidden" style={{ borderColor: 'var(--border-default)' }}>
             <div className="flex flex-col gap-1">
               {(user ? navItems : [
                 { to: '/features', label: t('nav.features', 'Features') },

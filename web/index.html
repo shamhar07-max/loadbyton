@@ -26,6 +26,16 @@
       media="print"
       data-async-font
     />
+    <!-- Scroll-reveal (.reveal in index.css) starts at opacity:0 and is
+         only flipped visible by an IntersectionObserver in lib/motion.js —
+         correct for a JS-enabled browser, but a fetcher that never
+         executes JS at all would see that content stuck invisible
+         forever. This forces it to its final visible state whenever
+         JavaScript doesn't run, so a no-JS crawler still gets full
+         content, matching the crawlability fix in server/index.js. -->
+    <noscript>
+      <style>.reveal { opacity: 1 !important; transform: none !important; }</style>
+    </noscript>
   </head>
   <body>
     <div id="root"></div>
