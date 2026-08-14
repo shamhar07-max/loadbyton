@@ -115,14 +115,14 @@ export default function Landing() {
       {/* How it works — a real sequence, numbering earns its place here. */}
       <section className="border-b py-16" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page">
-          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Four steps, one escrow.</Reveal>
-          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Every shipment moves through the same sequence, regardless of equipment type or emirate — one workflow to learn, not one per carrier relationship.</Reveal>
+          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">One system. Zero chasing.</Reveal>
+          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Post, bid, award, deliver — the same sequence every time, whether it's one container or a fifty-truck contract lane.</Reveal>
           <div className="mt-10 grid gap-8 md:grid-cols-4">
             {[
-              { n: '01', title: 'Post the job', body: 'Specify equipment type, pickup terminal, delivery address, deadline, and budget. For more than one unit, post the count once as a volume inquiry.', icon: <IconPackage size={20} /> },
-              { n: '02', title: 'Carriers bid', body: 'Only carriers verified on trade licence, insurance, and TRN can bid. Each price and ETA is benchmarked against the live Lane Index.', icon: <IconTruck size={20} /> },
-              { n: '03', title: 'Award & escrow', body: 'Accepting a bid locks the price and creates a single payout record — the shipment and its funds move together from that point on.', icon: <IconShield size={20} /> },
-              { n: '04', title: 'Deliver & release', body: 'The carrier uploads proof of delivery for your confirmation. If no action is taken, escrow releases automatically after 24 hours.', icon: <IconClock size={20} /> },
+              { n: '01', title: 'Post the job', body: 'Equipment, terminal, delivery address, deadline, budget — one form, structured instantly. No back-and-forth to get a job in front of carriers.', icon: <IconPackage size={20} /> },
+              { n: '02', title: 'Carriers bid', body: 'Verified carriers only — TRN, trade licence, and insurance checked before they ever see a load. Every bid is priced against the live Lane Index.', icon: <IconTruck size={20} /> },
+              { n: '03', title: 'Award & escrow', body: 'Accept a bid and the price locks. Funds move into escrow automatically — no invoice to chase, no transfer to confirm by phone.', icon: <IconShield size={20} /> },
+              { n: '04', title: 'Deliver & release', body: "POD goes up, escrow releases — confirm it yourself or let the 24-hour auto-release handle it. Either way, you're not calling anyone to get paid.", icon: <IconClock size={20} /> },
             ].map((step, i) => (
               <Reveal key={step.n} delay={i * 70}>
                 <div className="flex h-10 w-10 items-center justify-center rounded-md" style={{ background: 'var(--bg-raised)', color: 'var(--brand-accent)' }}>
@@ -140,8 +140,8 @@ export default function Landing() {
       {/* Equipment coverage — not just containers. */}
       <section className="border-b py-16" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page">
-          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Equipment coverage beyond containers.</Reveal>
-          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Twelve equipment classes are supported today — container chassis and reefer trucks, flatbed and curtain-side trailers, tripper and side-loader configurations, and pickups from three to ten tonnes. Select what the job requires; carrier matching and pricing adjust accordingly.</Reveal>
+          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Every truck class. One platform.</Reveal>
+          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Container chassis, reefer, flatbed, curtain-side, tripper, side-loader, and four pickup tonnages — twelve equipment types, matched and priced the same way, every time.</Reveal>
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {EQUIPMENT_TYPES.map((t, i) => {
               const EqIcon = EQUIPMENT_ICONS[t] || IconTruck;
@@ -161,8 +161,8 @@ export default function Landing() {
       {/* UAE coverage — explicitly not Jebel-Ali-only. */}
       <section className="border-b py-16" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page">
-          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Coverage across four emirates.</Reveal>
-          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Loadbyton operates from six terminals spanning Dubai, Abu Dhabi, Sharjah, and Fujairah. Escrow, bidding, and the Lane Index work identically at every terminal — pricing and carrier availability are simply local to where the job originates.</Reveal>
+          <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Built for the whole UAE — not just Dubai.</Reveal>
+          <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Six terminals, four emirates, one Lane Index. Post a job from Fujairah Port the same way you'd post one from Jebel Ali — same escrow, same bidding, same rules.</Reveal>
           <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {TERMINALS.map((t, i) => (
               <Reveal key={t} delay={(i % 3) * 60} className="card flex items-start gap-3 p-4">
@@ -184,8 +184,8 @@ export default function Landing() {
         <div className="container-page">
           <Reveal className="flex flex-col items-start justify-between gap-6 rounded-xl border px-8 py-10 sm:flex-row sm:items-center" style={{ borderColor: 'var(--border-default)' }}>
             <div>
-              <p className="font-display text-xl font-semibold text-ink">Multi-unit and multi-truck jobs, posted once.</p>
-              <p className="mt-1 max-w-lg text-sm text-ink-muted">State the container count or truck count when posting — carriers bid to cover the full batch under a single agreed price, rather than negotiating unit by unit.</p>
+              <p className="font-display text-xl font-semibold text-ink">Ten containers or five trucks — one job, not ten conversations.</p>
+              <p className="mt-1 max-w-lg text-sm text-ink-muted">State the count once. Carriers bid to cover the whole batch at one agreed price — no unit-by-unit negotiation, no separate thread per truck.</p>
             </div>
             <Link to="/register" className="btn-secondary shrink-0 rounded-full px-6 py-3 text-base">
               Post a volume inquiry <IconArrowRight size={18} />
@@ -199,8 +199,8 @@ export default function Landing() {
         <div className="container-page">
           <div className="flex items-end justify-between">
             <div>
-              <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">A verified carrier network.</Reveal>
-              <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Every carrier is reviewed against trade licence, TRN, and insurance documentation before their first bid is accepted. Ratings and completed-job counts are drawn from delivery history on the platform, not self-reported.</Reveal>
+              <Reveal as="h2" className="font-display text-2xl font-semibold text-ink">Carriers who show up — verified, rated, accountable.</Reveal>
+              <Reveal as="p" delay={40} className="mt-2 max-w-xl text-sm text-ink-muted">Trade licence, TRN, and insurance checked before their first bid. Ratings and job counts come from delivery history on the platform — not a phone reference.</Reveal>
             </div>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -225,8 +225,8 @@ export default function Landing() {
         <div className="container-page">
           <Reveal className="flex flex-col items-start justify-between gap-6 rounded-xl px-8 py-10 sm:flex-row sm:items-center" style={{ background: 'var(--lb-ink-900)' }}>
             <div>
-              <p className="font-display text-xl font-semibold text-white">Recurring lanes, without recurring negotiation.</p>
-              <p className="mt-1 text-sm text-white/60">Save a lane's equipment, route, and terms once. Re-posting it for the next shipment takes two steps, not a new round of quotes.</p>
+              <p className="font-display text-xl font-semibold text-white">Run your lanes. Stop re-running the negotiation.</p>
+              <p className="mt-1 text-sm text-white/60">Save a lane's equipment, route, and terms once. Next time, it's two taps — not a new round of calls and quotes.</p>
             </div>
             <Link to="/register" className="btn-accent rounded-full px-6 py-3 text-base">
               Get started free <IconArrowRight size={18} />
