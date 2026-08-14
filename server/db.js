@@ -279,6 +279,15 @@ addColumn('bids', 'driver_phone', 'driver_phone TEXT');
 addColumn('jobs', 'assigned_driver_name', 'assigned_driver_name TEXT');
 addColumn('jobs', 'assigned_driver_phone', 'assigned_driver_phone TEXT');
 
+// TODO-3 — payout release today is a DB status flip; the actual bank
+// transfer is a founder-executed manual step with nothing tracking whether
+// it happened. sla_deadline turns the "48h" promise into something an admin
+// view can flag as overdue instead of a silent assumption; transfer_*_at is
+// the admin's explicit confirmation that the real-world wire actually went.
+addColumn('payouts', 'sla_deadline', 'sla_deadline TEXT');
+addColumn('payouts', 'transfer_executed_at', 'transfer_executed_at TEXT');
+addColumn('payouts', 'transfer_reference', 'transfer_reference TEXT');
+
 addColumn('audit_log', 'entity_type', 'entity_type TEXT');
 addColumn('audit_log', 'entity_id', 'entity_id INTEGER');
 addColumn('audit_log', 'before_state', 'before_state TEXT');

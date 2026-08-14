@@ -130,6 +130,23 @@ test('core loop: post -> bid -> award -> pod -> status, with escrow and payout t
   const invoiceDoc = await carrier.get(`/api/invoices/${invoice.id}`);
   assert.equal(invoiceDoc.status, 200);
   assert.match(invoiceDoc.raw, /Tax Invoice/);
+
+  // TODO-3: the release is a DB flip; the real bank transfer is a manual
+  // step that must show up as outstanding until an admin confirms it.
+  const slaBefore = await admin.get('/api/admin/payouts-sla');
+  assert.equal(slaBefore.status, 200);
+  const outstanding = slaBefore.body.pending.find((p) => p.job_id === jobId);
+  assert.ok(outstanding, 'a released payout with no confirmed transfer must appear as outstanding');
+  assert.ok(outstanding.sla_deadline, 'sla_deadline must be set at release time');
+
+  const confirm = await admin.post(`/api/admin/payouts/${outstanding.id}/mark-transferred`, { reference: 'WIRE-TEST-1' });
+  assert.equal(confirm.status, 200, confirm.raw);
+
+  const slaAfter = await admin.get('/api/admin/payouts-sla');
+  assert.ok(!slaAfter.body.pending.find((p) => p.job_id === jobId), 'confirmed transfer must drop off the outstanding list');
+
+  const doubleConfirm = await admin.post(`/api/admin/payouts/${outstanding.id}/mark-transferred`, {});
+  assert.equal(doubleConfirm.status, 409, 'confirming an already-confirmed transfer must not silently succeed');
 });
 
 test('auto-release sweep (x-internal-key) releases past-window deliveries without an admin session', async () => {

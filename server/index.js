@@ -235,7 +235,7 @@ function runAutoReleaseSweep(req) {
       db.prepare(
         `UPDATE jobs SET escrow_status='RELEASED', auto_release_processed=1, payout_released_at=datetime('now'), updated_at=datetime('now') WHERE id=?`
       ).run(job.id);
-      db.prepare(`UPDATE payouts SET status='RELEASED', release_type='AUTO_24H', released_at=datetime('now') WHERE job_id=?`).run(job.id);
+      db.prepare(`UPDATE payouts SET status='RELEASED', release_type='AUTO_24H', released_at=datetime('now'), sla_deadline=datetime('now', '+48 hours') WHERE job_id=?`).run(job.id);
       issueInvoice(db, job.id);
       writeAudit(req, {
         action: 'ESCROW_RELEASE',
@@ -712,7 +712,7 @@ app.patch('/api/jobs/:id/status', auth(), (req, res) => {
   }
   if (next === 'COMPLETED' && job.escrow_status !== 'RELEASED') {
     db.prepare(`UPDATE jobs SET escrow_status='RELEASED', payout_released_at=datetime('now') WHERE id=?`).run(job.id);
-    db.prepare(`UPDATE payouts SET status='RELEASED', release_type='MANUAL', released_at=datetime('now') WHERE job_id=?`).run(job.id);
+    db.prepare(`UPDATE payouts SET status='RELEASED', release_type='MANUAL', released_at=datetime('now'), sla_deadline=datetime('now', '+48 hours') WHERE job_id=?`).run(job.id);
     issueInvoice(db, job.id);
     notify(job.carrier_id, 'Funds on the way', `${job.job_code} was confirmed delivered. Payout released.`, job.id);
   }
@@ -1258,7 +1258,7 @@ app.post('/api/admin/disputes/:id/resolve', auth(['ADMIN']), (req, res) => {
   if (decision === 'REFUND_SHIPPER') {
     db.prepare(`UPDATE payouts SET status='CANCELLED' WHERE job_id=?`).run(job.id);
   } else {
-    db.prepare(`UPDATE payouts SET status='RELEASED', release_type='DISPUTE_RESOLUTION', released_at=datetime('now') WHERE job_id=?`).run(job.id);
+    db.prepare(`UPDATE payouts SET status='RELEASED', release_type='DISPUTE_RESOLUTION', released_at=datetime('now'), sla_deadline=datetime('now', '+48 hours') WHERE job_id=?`).run(job.id);
     issueInvoice(db, job.id);
   }
   db.prepare(`UPDATE jobs SET status='COMPLETED', escrow_status='RELEASED', payout_released_at=datetime('now'), updated_at=datetime('now') WHERE id=?`).run(job.id);
@@ -1305,6 +1305,47 @@ app.get('/api/admin/revenue', auth(['ADMIN']), (req, res) => {
   const escrowHeldAED = db.prepare(`SELECT COALESCE(SUM(agreed_price_aed),0) s FROM jobs WHERE escrow_status IN ('HELD','FUNDED')`).get().s;
   const avgTakeRate = gmvAED > 0 ? `${((platformFeesAED / gmvAED) * 100).toFixed(1)}%` : '0.0%';
   res.json({ revenue: { gmvAED, platformFeesAED, escrowHeldAED, avgTakeRate } });
+});
+
+// TODO-3: the 48h payout promise is a founder-executed manual transfer with
+// nothing tracking whether it actually happened — this makes that visible
+// and chaseable instead of a silent assumption.
+app.get('/api/admin/payouts-sla', auth(['ADMIN']), (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT p.id, p.job_id, j.job_code, p.carrier_id, p.net_aed, p.release_type, p.released_at,
+              p.sla_deadline, p.transfer_executed_at, p.transfer_reference
+       FROM payouts p JOIN jobs j ON j.id = p.job_id
+       WHERE p.status = 'RELEASED' AND p.transfer_executed_at IS NULL
+       ORDER BY p.sla_deadline ASC`
+    )
+    .all();
+  const now = new Date();
+  const pending = rows.map((r) => ({
+    ...r,
+    overdue: r.sla_deadline ? new Date(r.sla_deadline.replace(' ', 'T') + 'Z') < now : false,
+  }));
+  res.json({ pending, overdueCount: pending.filter((r) => r.overdue).length });
+});
+
+app.post('/api/admin/payouts/:id/mark-transferred', auth(['ADMIN']), (req, res) => {
+  const payout = db.prepare('SELECT * FROM payouts WHERE id=?').get(req.params.id);
+  if (!payout) return sendError(res, 404, 'Payout not found');
+  if (payout.status !== 'RELEASED') return sendError(res, 400, 'Payout is not in RELEASED state yet');
+  if (payout.transfer_executed_at) return sendError(res, 409, 'Transfer already confirmed for this payout');
+  const { reference } = req.body || {};
+  db.prepare(`UPDATE payouts SET transfer_executed_at=datetime('now'), transfer_reference=? WHERE id=?`).run(reference || null, payout.id);
+  writeAudit(req, {
+    userId: req.user.id,
+    action: 'PAYOUT_TRANSFER_CONFIRMED',
+    details: `Payout #${payout.id} (AED ${payout.net_aed}) confirmed transferred${reference ? ` — ref ${reference}` : ''}`,
+    entityType: 'payout',
+    entityId: payout.id,
+    beforeState: 'PENDING_TRANSFER',
+    afterState: 'TRANSFERRED',
+  });
+  const updated = db.prepare('SELECT * FROM payouts WHERE id=?').get(payout.id);
+  res.json({ payout: updated });
 });
 
 app.get('/api/admin/settings', auth(['ADMIN']), (req, res) => {
