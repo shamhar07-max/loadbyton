@@ -11,6 +11,7 @@ const db = require('./db');
 const totp = require('./lib/totp');
 const { unifiedLanes, estimateRate, optimizeRoute } = require('./lib/lanes');
 const { issueInvoice, renderInvoiceHtml } = require('./lib/invoice');
+const { rateLimiter, byIp } = require('./lib/rateLimit');
 const {
   cookieParser,
   requestId,
@@ -30,10 +31,23 @@ const DIST_INDEX = path.join(DIST_DIR, 'index.html');
 
 const app = express();
 app.disable('x-powered-by');
+// Required for req.ip to reflect the real client behind Render/Cloudflare —
+// without this, every request behind a proxy shares one IP and the rate
+// limiter below would throttle all users as if they were one.
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cookieParser);
 app.use(requestId);
 app.use(securityHeaders);
+
+// General API rate limiting — previously the ONLY throttle anywhere in the
+// app was the per-email login lockout further down; every other route,
+// including job posting and bidding, had no ceiling at all.
+const apiLimiter = rateLimiter({ windowMs: 60 * 1000, max: 300, keyFn: byIp });
+app.use('/api', apiLimiter);
+const authLimiter = rateLimiter({ windowMs: 60 * 1000, max: 20, keyFn: byIp, message: 'Too many auth requests from this address. Try again shortly.' });
+app.use('/api/auth', authLimiter);
+const writeLimiter = rateLimiter({ windowMs: 60 * 1000, max: 30, keyFn: byIp, message: 'Too many requests. Slow down and try again.' });
 
 // Dev CORS — a no-op in production, where the SPA is same-origin.
 app.use((req, res, next) => {
@@ -492,7 +506,7 @@ app.get('/api/jobs', auth(), (req, res) => {
   res.json({ jobs });
 });
 
-app.post('/api/jobs', auth(['SHIPPER']), (req, res) => {
+app.post('/api/jobs', auth(['SHIPPER']), writeLimiter, (req, res) => {
   const b = req.body || {};
   const required = ['pickupTerminal', 'deliveryArea', 'deliveryAddress', 'readyAt', 'deadline'];
   for (const f of required) if (!b[f]) return sendError(res, 400, `${f} is required`);
@@ -572,7 +586,7 @@ app.get('/api/jobs/:id', auth(), (req, res) => {
   res.json({ job, bids, documents, payout });
 });
 
-app.post('/api/jobs/:id/bids', auth(['CARRIER']), (req, res) => {
+app.post('/api/jobs/:id/bids', auth(['CARRIER']), writeLimiter, (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
   if (job.status !== 'OPEN') return sendError(res, 403, 'Job is not open for bidding.');

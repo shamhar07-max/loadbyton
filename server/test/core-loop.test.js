@@ -163,3 +163,12 @@ test('auto-release sweep rejects requests with no key and no admin session', asy
   const res = await fetch(`${server.baseUrl}/api/system/auto-release`, { method: 'POST' });
   assert.equal(res.status, 403);
 });
+
+test('per-IP rate limiting kicks in on /api/auth — previously the ONLY throttle in the app was per-email login lockout', async () => {
+  const statuses = [];
+  for (let i = 0; i < 25; i++) {
+    const res = await fetch(`${server.baseUrl}/api/auth/me`);
+    statuses.push(res.status);
+  }
+  assert.ok(statuses.includes(429), `expected a 429 somewhere in 25 rapid requests, got: ${statuses.join(',')}`);
+});
