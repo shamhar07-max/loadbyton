@@ -4,6 +4,7 @@
 
 const bcrypt = require('bcryptjs');
 const db = require('./db');
+const { encryptField } = require('./lib/crypto');
 
 function sqliteTime(offsetMs = 0) {
   return new Date(Date.now() + offsetMs).toISOString().slice(0, 19).replace('T', ' ');
@@ -31,10 +32,10 @@ module.exports = function seed() {
     ).run(
       userId,
       p.company,
-      p.trn || null,
+      encryptField(p.trn),
       p.license || null,
       p.phone || null,
-      p.iban || null,
+      encryptField(p.iban),
       p.zones || null,
       p.fleet || 0,
       p.chassis || 0,

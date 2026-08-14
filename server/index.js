@@ -12,6 +12,7 @@ const totp = require('./lib/totp');
 const { unifiedLanes, estimateRate, optimizeRoute } = require('./lib/lanes');
 const { issueInvoice, renderInvoiceHtml } = require('./lib/invoice');
 const { rateLimiter, byIp } = require('./lib/rateLimit');
+const { encryptField, decryptField } = require('./lib/crypto');
 const {
   cookieParser,
   requestId,
@@ -115,10 +116,10 @@ function toPublicUser(row) {
     profile: profile
       ? {
           company_name: profile.company_name,
-          trn_number: profile.trn_number,
+          trn_number: decryptField(profile.trn_number),
           trade_license_number: profile.trade_license_number,
           phone: profile.phone,
-          iban: profile.iban,
+          iban: decryptField(profile.iban),
           coverage_zones: profile.coverage_zones,
           fleet_size: profile.fleet_size,
           owned_chassis: profile.owned_chassis,
@@ -318,7 +319,7 @@ app.post(
     const userId = Number(userResult.lastInsertRowid);
     db.prepare(
       'INSERT INTO profiles (user_id, company_name, trn_number, trade_license_number, phone) VALUES (?,?,?,?,?)'
-    ).run(userId, companyName, trnNumber || null, tradeLicenseNumber || null, phone || null);
+    ).run(userId, companyName, encryptField(trnNumber), tradeLicenseNumber || null, phone || null);
 
     writeAudit(req, { userId, action: 'REGISTER', details: `${role} registered: ${email}`, entityType: 'user', entityId: userId });
     createSession(req, res, userId);
@@ -384,10 +385,10 @@ app.patch('/api/profile', auth(), (req, res) => {
   const b = req.body || {};
   const fields = {
     company_name: b.companyName,
-    trn_number: b.trnNumber,
+    trn_number: b.trnNumber === undefined ? undefined : encryptField(b.trnNumber),
     trade_license_number: b.tradeLicenseNumber,
     phone: b.phone,
-    iban: b.iban,
+    iban: b.iban === undefined ? undefined : encryptField(b.iban),
     coverage_zones: b.coverageZones,
     fleet_size: b.fleetSize,
     owned_chassis: b.ownedChassis,
@@ -1100,7 +1101,7 @@ app.get('/api/admin/verification', auth(['ADMIN']), (req, res) => {
       created_at: r.created_at,
       profile: {
         company_name: r.company_name,
-        trn_number: r.trn_number,
+        trn_number: decryptField(r.trn_number),
         trade_license_number: r.trade_license_number,
         phone: r.phone,
         fleet_size: r.fleet_size,
@@ -1122,7 +1123,7 @@ app.post('/api/admin/verify/:id', auth(['ADMIN']), (req, res) => {
     const existingIban = db.prepare('SELECT iban FROM profiles WHERE user_id=?').get(carrier.id).iban;
     if (!iban && !existingIban) return sendError(res, 400, 'IBAN is required to approve verification');
     db.prepare('UPDATE users SET is_verified=1 WHERE id=?').run(carrier.id);
-    db.prepare(`UPDATE profiles SET verified_at=datetime('now'), iban=COALESCE(?, iban) WHERE user_id=?`).run(iban || null, carrier.id);
+    db.prepare(`UPDATE profiles SET verified_at=datetime('now'), iban=COALESCE(?, iban) WHERE user_id=?`).run(iban ? encryptField(iban) : null, carrier.id);
     writeAudit(req, { userId: req.user.id, action: 'VERIFY', details: `Approved carrier #${carrier.id}`, entityType: 'user', entityId: carrier.id, afterState: 'VERIFIED' });
     notify(carrier.id, 'Verification approved', 'You can now bid on open loads.');
   } else {

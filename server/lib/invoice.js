@@ -17,6 +17,8 @@
 // decision for the business, not something this code should decide
 // unilaterally. Flip TAX_INCLUSIVE below once that's settled.
 
+const { decryptField } = require('./crypto');
+
 const VAT_RATE_BPS = 500; // 5% UAE standard rate
 const TAX_INCLUSIVE = true;
 
@@ -70,7 +72,7 @@ function issueInvoice(db, jobId) {
       jobId,
       payout.carrier_id,
       supplierTrn,
-      carrierProfile ? carrierProfile.trn_number : null,
+      carrierProfile ? decryptField(carrierProfile.trn_number) : null,
       payout.gross_aed,
       payout.platform_fee_aed,
       VAT_RATE_BPS,

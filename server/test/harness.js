@@ -73,7 +73,7 @@ async function startServer() {
     }
   }
 
-  return { baseUrl, stop };
+  return { baseUrl, dbPath, stop };
 }
 
 // Minimal per-actor cookie jar — fetch doesn't persist Set-Cookie across
