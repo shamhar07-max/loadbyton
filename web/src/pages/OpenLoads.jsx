@@ -17,6 +17,10 @@ export default function OpenLoads() {
     api.listJobs({ status: 'OPEN' }).then((d) => setJobs(d.jobs)).catch(() => setJobs([]));
   }, []);
 
+  // F15, fixed independently on both branches: `jobs?.filter(...)` on a
+  // null `jobs` (still loading) evaluates to `undefined`, not `null` — the
+  // `=== null` check below then missed it and `.length` on undefined
+  // crashed to a white screen. Keep it `null` explicitly until jobs load.
   const filteredJobs = jobs === null ? null : equipmentFilter === 'all' ? jobs : jobs.filter((j) => j.equipment_type === equipmentFilter);
 
   return (
@@ -55,6 +59,12 @@ export default function OpenLoads() {
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
+                    {/* F20, fixed independently on both branches — kept
+                        main's fully-split conditionals (also for
+                        container/truck count, not just hazmat/reefer): a
+                        job that was both hazmat and reefer, or somehow had
+                        both counts set, used to render only one badge when
+                        either pair shared a single ternary. */}
                     {!!j.requires_hazmat && <Badge color="warning">Hazmat</Badge>}
                     {!!j.requires_reefer && <Badge color="warning">Reefer</Badge>}
                     {j.container_count > 1 && <Badge color="accent">×{j.container_count} containers</Badge>}

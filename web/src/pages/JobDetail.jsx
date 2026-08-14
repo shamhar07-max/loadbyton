@@ -336,9 +336,9 @@ function PodForm({ jobId, onDone, busy, setBusy, setError }) {
 }
 
 function DocumentList({ documents, jobId, onAdd }) {
+  const { addToast } = useToasts();
   const [form, setForm] = useState({ docType: 'CUSTOMS', title: '', fileUrl: '' });
   const [busy, setBusy] = useState(false);
-  const { addToast } = useToasts();
   async function submit(e) {
     e.preventDefault();
     if (!form.title || !form.fileUrl) return;
@@ -348,6 +348,9 @@ function DocumentList({ documents, jobId, onAdd }) {
       setForm({ docType: 'CUSTOMS', title: '', fileUrl: '' });
       onAdd();
     } catch (err) {
+      // F17, fixed independently on both branches: this had no catch — a
+      // failed add (e.g. a bad fileUrl) threw as an unhandled rejection and
+      // the user saw nothing.
       addToast({ type: 'system_message', title: 'Could not add document', body: err.message });
     } finally {
       setBusy(false);
@@ -382,9 +385,9 @@ function DocumentList({ documents, jobId, onAdd }) {
 
 function MessageThread({ messages, jobId, onSent }) {
   const { user } = useAuth();
+  const { addToast } = useToasts();
   const [content, setContent] = useState('');
   const [busy, setBusy] = useState(false);
-  const { addToast } = useToasts();
   async function submit(e) {
     e.preventDefault();
     if (!content.trim()) return;
@@ -394,6 +397,8 @@ function MessageThread({ messages, jobId, onSent }) {
       setContent('');
       onSent();
     } catch (err) {
+      // F17, fixed independently on both branches: same missing catch as
+      // DocumentList — a failed send silently vanished with no feedback.
       addToast({ type: 'system_message', title: 'Message not sent', body: err.message });
     } finally {
       setBusy(false);
@@ -433,6 +438,11 @@ function RatingForm({ jobId, onDone }) {
       setDone(true);
       onDone();
     } catch (err) {
+      // F14, fixed independently on both branches — kept main's toast
+      // (consistent with DocumentList/MessageThread above) over this
+      // branch's inline error state. This used to setDone(true) even on
+      // failure, so a rejected rating (e.g. already rated) silently
+      // displayed "Thanks for the rating" with no signal it didn't save.
       addToast({ type: 'system_message', title: 'Rating not saved', body: err.message });
     } finally {
       setBusy(false);

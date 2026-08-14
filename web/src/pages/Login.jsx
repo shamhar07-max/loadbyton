@@ -45,7 +45,10 @@ export default function Login() {
             <Input id="email" type="email" required autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@company.ae" />
           </div>
           <div>
-            <Label htmlFor="password">{t('auth.password')}</Label>
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="password">{t('auth.password')}</Label>
+              <Link to="/forgot-password" className="mb-1.5 text-xs font-medium text-brand-secondary hover:underline">Forgot password?</Link>
+            </div>
             <Input id="password" type="password" required autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" />
           </div>
           {needsMfa && (
@@ -68,7 +71,10 @@ export default function Login() {
 
         <div className="mt-6 rounded-md border px-4 py-3 text-xs text-ink-muted" style={{ borderColor: 'var(--border-default)' }}>
           <p className="mb-1 font-medium text-ink-secondary">Demo accounts (password: demo1234)</p>
-          <p>shipper@jebelalilogistics.ae · carrier@dubaidrayage.com · admin@loadbyton.ae</p>
+          {/* Admin is deliberately not seeded/advertised here — it can decrypt
+              carrier IBAN/TRN, impersonate users, and release escrow, so it's
+              never one of the publicly-invited demo logins (see server/seed.js). */}
+          <p>shipper@jebelalilogistics.ae · carrier@dubaidrayage.com</p>
         </div>
       </Card>
     </div>

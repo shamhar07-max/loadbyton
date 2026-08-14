@@ -24,6 +24,9 @@ import NotFound from './pages/NotFound.jsx';
 // entire dashboard/admin app just to read the pricing page.
 const Login = lazy(() => import('./pages/Login.jsx'));
 const Register = lazy(() => import('./pages/Register.jsx'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword.jsx'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword.jsx'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const OpenLoads = lazy(() => import('./pages/OpenLoads.jsx'));
 const JobDetail = lazy(() => import('./pages/JobDetail.jsx'));
@@ -75,6 +78,9 @@ export default function App() {
 
           <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
           <Route path="/register" element={<GuestOnly><Register /></GuestOnly>} />
+          <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
+          <Route path="/reset-password" element={<GuestOnly><ResetPassword /></GuestOnly>} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
           <Route path="/dashboard" element={<RequireAuth roles={['SHIPPER']}><Dashboard /></RequireAuth>} />
           <Route path="/templates" element={<RequireAuth roles={['SHIPPER']}><Templates /></RequireAuth>} />

@@ -44,6 +44,9 @@ export default function Dashboard() {
     setSubmitting(true);
     setError('');
     try {
+      // F11, fixed independently on both branches — kept main's optional
+      // chaining (form never had a job_code field; the server generates it,
+      // so the toast always fell back to a placeholder before this).
       const created = await api.createJob({
         ...form,
         maxBudgetAed: form.maxBudgetAed ? Number(form.maxBudgetAed) : undefined,

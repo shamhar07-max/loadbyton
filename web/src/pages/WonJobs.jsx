@@ -15,10 +15,10 @@ export default function WonJobs() {
   const [jobs, setJobs] = useState(null);
 
   useEffect(() => {
-    // mine=1 — this carrier's own jobs only, any status. Filtering client-
-    // side against the default (mixed-in OPEN-jobs-from-everyone) view meant
-    // an older awarded job could fall past the 50-row page limit before this
-    // component ever saw it.
+    // F19, fixed independently on both branches — kept main's server-side
+    // mine=1 scope (this carrier's own jobs only, any status) over this
+    // branch's client-side limit:200 bump, since it doesn't depend on the
+    // carrier's job count staying under a fixed page size at all.
     api.listJobs({ mine: 1, limit: 200 }).then((d) => {
       const won = d.jobs.filter((j) => ACTIVE_STATUSES.includes(j.status));
       setJobs(won);

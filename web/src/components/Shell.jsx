@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, roleHome } from '../lib/auth.jsx';
 import { useLocale } from '../lib/i18n.jsx';
+import { api } from '../lib/api.js';
 import { IconMenu, IconClose, IconBell, IconLogOut, IconUser, IconMoon, IconSun } from './icons.jsx';
 import { useToasts } from './Toast.jsx';
 
@@ -46,8 +47,21 @@ export function Shell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [endingImpersonation, setEndingImpersonation] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const navItems = user ? NAV_BY_ROLE[user.role] || [] : [];
   const { addToast } = useToasts();
+
+  async function handleResendVerification() {
+    setResendingVerification(true);
+    try {
+      await api.resendVerification();
+      addToast({ type: 'system_message', title: 'Verification email sent', body: 'Check your inbox for the link.' });
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not send verification email', body: err.message });
+    } finally {
+      setResendingVerification(false);
+    }
+  }
 
   async function handleLogout() {
     await logout();
@@ -76,6 +90,15 @@ export function Shell({ children }) {
           <span>Impersonating {user.profile?.company_name || user.email} — actions here are logged to the audit trail.</span>
           <button onClick={handleEndImpersonation} disabled={endingImpersonation} className="rounded-md border border-white/40 px-2.5 py-1 text-xs font-semibold hover:bg-white/10">
             {endingImpersonation ? 'Returning…' : 'Return to admin'}
+          </button>
+        </div>
+      )}
+
+      {user && !user.email_verified && !user.impersonating && (
+        <div className="flex flex-wrap items-center justify-center gap-3 px-4 py-2 text-sm" style={{ background: 'var(--status-warning-bg)', color: 'var(--status-warning)' }}>
+          <span>Verify your email to keep full access to your account.</span>
+          <button onClick={handleResendVerification} disabled={resendingVerification} className="font-semibold underline underline-offset-2 disabled:opacity-60">
+            {resendingVerification ? 'Sending…' : 'Resend verification email'}
           </button>
         </div>
       )}
@@ -214,7 +237,14 @@ export function Shell({ children }) {
 
       <footer className="border-t" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page flex flex-col gap-6 py-10 sm:flex-row sm:items-center sm:justify-between">
-          <Logo dark />
+          {/* D1 (gstack review): this was <Logo dark />, hardcoding white
+              wordmark text regardless of theme — invisible (1.00:1 contrast)
+              against this footer's theme-aware light-mode background. The
+              footer has no fixed-dark background of its own (unlike the
+              brand mark's tile, which is intentionally fixed-color), so the
+              logo should use the same theme-aware text token every other
+              surface does. */}
+          <Logo />
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-muted">
             <Link to="/features" className="hover:text-ink">Features</Link>
             <Link to="/pricing" className="hover:text-ink">Pricing</Link>

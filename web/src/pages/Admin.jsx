@@ -92,10 +92,10 @@ function HealthTab() {
 }
 
 function VerificationTab() {
+  const { addToast } = useToasts();
   const [queue, setQueue] = useState(null);
   const [ibanDrafts, setIbanDrafts] = useState({});
   const [busyId, setBusyId] = useState(null);
-  const { addToast } = useToasts();
 
   function load() {
     api.adminVerificationQueue().then((d) => setQueue(d.queue)).catch(() => setQueue([]));
@@ -108,6 +108,8 @@ function VerificationTab() {
       await api.adminVerify(id, { action, iban: ibanDrafts[id] || undefined });
       load();
     } catch (err) {
+      // F16, fixed independently on both branches: no catch meant e.g. a
+      // missing-IBAN 400 on approve did nothing visible.
       addToast({ type: 'system_message', title: 'Could not update verification', body: err.message });
     } finally {
       setBusyId(null);
@@ -147,11 +149,11 @@ function VerificationTab() {
 }
 
 function DisputesTab() {
+  const { addToast } = useToasts();
   const [disputes, setDisputes] = useState(null);
   const [form, setForm] = useState({ jobId: '', reason: '' });
   const [resolveDrafts, setResolveDrafts] = useState({});
   const [busy, setBusy] = useState(false);
-  const { addToast } = useToasts();
 
   function load() {
     api.adminDisputes().then((d) => setDisputes(d.disputes)).catch(() => setDisputes([]));
@@ -166,6 +168,8 @@ function DisputesTab() {
       setForm({ jobId: '', reason: '' });
       load();
     } catch (err) {
+      // F16, fixed independently on both branches: no catch here either —
+      // e.g. an invalid job ID failed silently with the form just sitting there.
       addToast({ type: 'system_message', title: 'Could not open dispute', body: err.message });
     } finally {
       setBusy(false);
@@ -354,12 +358,12 @@ function RevenueTab() {
 }
 
 function SettingsTab() {
+  const { addToast } = useToasts();
   const [settings, setSettings] = useState(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [sweeping, setSweeping] = useState(false);
   const [sweepResult, setSweepResult] = useState(null);
-  const { addToast } = useToasts();
 
   function load() {
     api.adminGetSettings().then((d) => setSettings(d.settings)).catch(() => {});
@@ -375,6 +379,9 @@ function SettingsTab() {
       setSettings(d.settings);
       setSaved(true);
     } catch (err) {
+      // F16, fixed independently on both branches: an out-of-range value
+      // (e.g. commission_rate_bps > 10000) used to 400 with zero on-screen
+      // feedback.
       addToast({ type: 'system_message', title: 'Could not save settings', body: err.message });
     } finally {
       setBusy(false);

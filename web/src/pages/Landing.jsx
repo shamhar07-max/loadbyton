@@ -278,7 +278,7 @@ export default function Landing() {
               <Reveal key={c?.id || i} delay={(i % 4) * 60} className="card card-hover p-5">
                 <div className="flex items-start justify-between">
                   <p className="font-display text-sm font-semibold text-ink">{c?.name || 'Loading…'}</p>
-                  <span className="badge" style={{ background: 'var(--lb-orange-100)', color: 'var(--brand-accent)' }}>{c?.tier}</span>
+                  <span className="badge" style={{ background: 'var(--brand-accent-bg)', color: 'var(--brand-accent)' }}>{c?.tier}</span>
                 </div>
                 <p className="mt-2 flex items-center gap-1 text-sm text-ink-secondary">
                   <IconStar size={14} style={{ color: 'var(--brand-accent)' }} /> {c?.rating?.toFixed?.(2) ?? '—'} · {c?.completedJobs ?? 0} jobs

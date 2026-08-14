@@ -4,6 +4,7 @@
 
 const path = require('node:path');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 
@@ -14,6 +15,7 @@ const { issueInvoice, renderInvoiceHtml } = require('./lib/invoice');
 const { rateLimiter, byIp } = require('./lib/rateLimit');
 const { encryptField, decryptField } = require('./lib/crypto');
 const { notifyDriverAsync } = require('./lib/whatsapp');
+const { sendEmailAsync } = require('./lib/email');
 const {
   cookieParser,
   requestId,
@@ -28,6 +30,10 @@ const {
 const PORT = Number(process.env.PORT) || 4000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const INTERNAL_KEY = process.env.INTERNAL_KEY || randomToken(16);
+// gstack review F22: a hash to compare against when no user row exists, so
+// a login attempt for an unregistered email pays the same bcrypt cost as
+// one for a registered email with the wrong password — see the login route.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('no-such-user-timing-guard', 10);
 const DIST_DIR = path.join(__dirname, '..', 'web', 'dist');
 const DIST_INDEX = path.join(DIST_DIR, 'index.html');
 
@@ -80,6 +86,30 @@ function normalizeUaeMobile(raw) {
   return UAE_MOBILE_RE.test(digits) ? digits : null;
 }
 
+// gstack review F2: length is the one password rule NIST 800-63B actually
+// recommends enforcing — no arbitrary symbol/number complexity theater.
+// Matches the frontend's Register.jsx minLength.
+const MIN_PASSWORD_LENGTH = 8;
+function isPasswordValid(password) {
+  return typeof password === 'string' && password.length >= MIN_PASSWORD_LENGTH;
+}
+
+// gstack review F9: raw `===` on a secret is a timing oracle in principle.
+// SHA-256 both sides first — fixes the comparison to a constant 32 bytes so
+// timingSafeEqual can't throw on a length mismatch, which is the usual
+// reason people avoid it for user-supplied input.
+function timingSafeEqualStr(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
+// Verification/reset tokens: the raw token goes to the user (via email);
+// only its hash is stored, so a leaked DB row can't be replayed as a token.
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 // Equipment/vehicle types a job can require and a carrier can bid with. The
 // two container-carrying types are the only ones where container_size/
 // container_type mean anything — every other type is general UAE road
@@ -109,6 +139,7 @@ function toPublicUser(row) {
     email: row.email,
     role: row.role,
     is_verified: !!row.is_verified,
+    email_verified: !!row.email_verified_at,
     mfa_enabled: !!row.mfa_enabled,
     tier: row.tier,
     referral_code: row.referral_code,
@@ -301,6 +332,20 @@ function runAutoReleaseSweep(req) {
       released++;
     } catch (e) {
       db.exec('ROLLBACK');
+      // gstack review F6: this used to swallow the error entirely — a
+      // failing issueInvoice() (or anything else in the transaction) meant
+      // the job silently never released, with nothing to grep for. Money
+      // moving on a schedule needs a visible failure, not a quiet retry.
+      // eslint-disable-next-line no-console
+      console.error(`[auto-release] job #${job.id} (${job.job_code}) failed, rolled back:`, e.message);
+      writeAudit(req, {
+        action: 'ESCROW_RELEASE_FAILED',
+        details: `Auto-release failed for ${job.job_code}: ${e.message}`,
+        entityType: 'job',
+        entityId: job.id,
+        beforeState: 'HELD',
+        afterState: 'HELD',
+      });
     }
   }
   return released;
@@ -308,7 +353,7 @@ function runAutoReleaseSweep(req) {
 
 app.post('/api/system/auto-release', (req, res) => {
   const key = req.headers['x-internal-key'];
-  let authorized = key && key === INTERNAL_KEY;
+  let authorized = typeof key === 'string' && timingSafeEqualStr(key, INTERNAL_KEY);
   if (!authorized) {
     const token = req.cookies.lb_session;
     const session = token && db.prepare('SELECT * FROM sessions WHERE session_token=?').get(token);
@@ -331,6 +376,7 @@ app.post(
   asyncHandler(async (req, res) => {
     const { email, password, role, companyName, phone, trnNumber, tradeLicenseNumber, referralCode: incomingReferral } = req.body || {};
     if (!email || !password || !companyName) return sendError(res, 400, 'email, password and companyName are required');
+    if (!isPasswordValid(password)) return sendError(res, 400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
     if (!['SHIPPER', 'CARRIER'].includes(role)) return sendError(res, 422, 'role must be SHIPPER or CARRIER');
     const existing = db.prepare('SELECT id FROM users WHERE email=?').get(email);
     if (existing) return sendError(res, 400, 'An account with that email already exists');
@@ -348,18 +394,110 @@ app.post(
       code = `${code}${Math.floor(Math.random() * 90 + 10)}`;
     }
 
+    // gstack review F3: a real, verifiable token — not just a flag — so
+    // identity squatting (registering an email you don't own) is at least
+    // detectable and the link can't be guessed. See server/lib/email.js for
+    // why this is safe to fire even with no provider configured.
+    const verifyToken = randomToken(32);
+    const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
     const userResult = db
-      .prepare('INSERT INTO users (email, password_hash, role, tier, referral_code, referred_by) VALUES (?,?,?,?,?,?)')
-      .run(email, passwordHash, role, 'BRONZE', code, referredBy);
+      .prepare(
+        'INSERT INTO users (email, password_hash, role, tier, referral_code, referred_by, email_verify_token_hash, email_verify_expires) VALUES (?,?,?,?,?,?,?,?)'
+      )
+      .run(email, passwordHash, role, 'BRONZE', code, referredBy, hashToken(verifyToken), verifyExpires);
     const userId = Number(userResult.lastInsertRowid);
     db.prepare(
       'INSERT INTO profiles (user_id, company_name, trn_number, trade_license_number, phone) VALUES (?,?,?,?,?)'
     ).run(userId, companyName, encryptField(trnNumber), tradeLicenseNumber || null, phone || null);
 
     writeAudit(req, { userId, action: 'REGISTER', details: `${role} registered: ${email}`, entityType: 'user', entityId: userId });
+    sendEmailAsync({
+      to: email,
+      subject: 'Verify your Loadbyton account',
+      html: `<p>Confirm this email address to finish setting up Loadbyton:</p><p><a href="${FRONTEND_URL}/verify-email?token=${verifyToken}">Verify email</a></p><p>This link expires in 24 hours.</p>`,
+    });
     createSession(req, res, userId);
     const user = db.prepare('SELECT * FROM users WHERE id=?').get(userId);
     res.status(201).json({ user: toPublicUser(user) });
+  })
+);
+
+app.get(
+  '/api/auth/verify-email',
+  asyncHandler(async (req, res) => {
+    const token = req.query.token;
+    if (!token || typeof token !== 'string') return sendError(res, 400, 'token is required');
+    const user = db
+      .prepare('SELECT id, email_verify_expires FROM users WHERE email_verify_token_hash=?')
+      .get(hashToken(token));
+    if (!user || !user.email_verify_expires || new Date(user.email_verify_expires) < new Date()) {
+      return sendError(res, 400, 'This verification link is invalid or has expired');
+    }
+    db.prepare(
+      `UPDATE users SET email_verified_at=datetime('now'), email_verify_token_hash=NULL, email_verify_expires=NULL WHERE id=?`
+    ).run(user.id);
+    writeAudit(req, { userId: user.id, action: 'EMAIL_VERIFY', entityType: 'user', entityId: user.id });
+    res.json({ ok: true });
+  })
+);
+
+app.post('/api/auth/resend-verification', auth(), (req, res) => {
+  if (req.user.email_verified_at) return sendError(res, 400, 'Email is already verified');
+  const verifyToken = randomToken(32);
+  const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  db.prepare('UPDATE users SET email_verify_token_hash=?, email_verify_expires=? WHERE id=?').run(hashToken(verifyToken), verifyExpires, req.user.id);
+  sendEmailAsync({
+    to: req.user.email,
+    subject: 'Verify your Loadbyton account',
+    html: `<p>Confirm this email address to finish setting up Loadbyton:</p><p><a href="${FRONTEND_URL}/verify-email?token=${verifyToken}">Verify email</a></p><p>This link expires in 24 hours.</p>`,
+  });
+  res.json({ ok: true });
+});
+
+// gstack review F3: the missing recovery path. Always 200 regardless of
+// whether the email exists — the response must not be a way to enumerate
+// registered accounts.
+app.post(
+  '/api/auth/forgot-password',
+  asyncHandler(async (req, res) => {
+    const { email } = req.body || {};
+    if (!email) return sendError(res, 400, 'email is required');
+    const user = db.prepare('SELECT id FROM users WHERE email=?').get(email);
+    if (user) {
+      const resetToken = randomToken(32);
+      const resetExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      db.prepare('UPDATE users SET password_reset_token_hash=?, password_reset_expires=? WHERE id=?').run(hashToken(resetToken), resetExpires, user.id);
+      writeAudit(req, { userId: user.id, action: 'PASSWORD_RESET_REQUEST', entityType: 'user', entityId: user.id });
+      sendEmailAsync({
+        to: email,
+        subject: 'Reset your Loadbyton password',
+        html: `<p>Reset your password:</p><p><a href="${FRONTEND_URL}/reset-password?token=${resetToken}">Reset password</a></p><p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>`,
+      });
+    }
+    res.json({ ok: true, message: 'If an account exists for that email, a reset link has been sent.' });
+  })
+);
+
+app.post(
+  '/api/auth/reset-password',
+  asyncHandler(async (req, res) => {
+    const { token, password } = req.body || {};
+    if (!token || typeof token !== 'string') return sendError(res, 400, 'token is required');
+    if (!isPasswordValid(password)) return sendError(res, 400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    const user = db
+      .prepare('SELECT id FROM users WHERE password_reset_token_hash=? AND password_reset_expires > datetime(\'now\')')
+      .get(hashToken(token));
+    if (!user) return sendError(res, 400, 'This reset link is invalid or has expired');
+
+    const passwordHash = bcrypt.hashSync(password, 10);
+    db.prepare('UPDATE users SET password_hash=?, password_reset_token_hash=NULL, password_reset_expires=NULL WHERE id=?').run(passwordHash, user.id);
+    // A password reset is exactly the moment every existing session (on
+    // every device, including whoever the attacker was if this reset was
+    // defensive) should be invalidated.
+    db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);
+    writeAudit(req, { userId: user.id, action: 'PASSWORD_RESET', entityType: 'user', entityId: user.id });
+    res.json({ ok: true });
   })
 );
 
@@ -371,7 +509,13 @@ app.post(
     if (isThrottled(email)) return sendError(res, 429, 'Too many failed attempts. Try again in a few minutes.');
 
     const user = db.prepare('SELECT * FROM users WHERE email=?').get(email);
-    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    // gstack review F22: `!user || !bcrypt.compareSync(...)` short-circuits
+    // past the bcrypt call entirely when the email doesn't exist, so a
+    // nonexistent-email response returns measurably faster than a
+    // wrong-password one — a timing oracle for enumerating registered
+    // emails. Always pay the bcrypt cost against *some* hash.
+    const passwordOk = bcrypt.compareSync(password, user ? user.password_hash : DUMMY_PASSWORD_HASH);
+    if (!user || !passwordOk) {
       recordFailure(email);
       return sendError(res, 403, 'Invalid email or password');
     }
@@ -532,9 +676,12 @@ app.patch('/api/org/members/:id', auth(['SHIPPER', 'CARRIER']), requireSeatRole(
 // 3. Public
 // =============================================================================
 
-// s-maxage lets Cloudflare edge-cache these for a short window without a
-// Render origin round-trip on every hit; max-age=0 keeps browsers always
-// revalidating so a signed-out visitor never sees minutes-stale numbers.
+// gstack review F27 (fixed independently on both branches — this keeps
+// main's version, which additionally covers the cache-miss-stampede case):
+// no s-maxage meant Cloudflare (sitting in front of Render) treated every
+// hit as uncacheable and forwarded it straight through. s-maxage is what
+// Cloudflare actually honors at the edge; max-age=0 keeps browsers always
+// revalidating so a signed-out visitor never sees minutes-stale numbers;
 // stale-while-revalidate covers the gap so a cache miss doesn't block on
 // origin while it refreshes.
 const PUBLIC_JSON_CACHE = 'public, max-age=0, s-maxage=30, stale-while-revalidate=60';
@@ -612,7 +759,11 @@ app.post('/api/bids/:id/withdraw', auth(['CARRIER']), (req, res) => {
 
 app.get('/api/jobs', auth(), (req, res) => {
   const { status, limit, offset, mine } = req.query;
-  const lim = Math.min(Number(limit) || 50, 200);
+  // gstack review F12: negative limit passed through to SQLite's LIMIT
+  // clause unclamped (LIMIT -1 means "no limit" in SQLite) — main's `mine`
+  // param (F19, a different/better fix than the client-side limit:200 bump
+  // this branch used) doesn't touch this, so both fixes are needed here.
+  const lim = Math.max(1, Math.min(Number(limit) || 50, 200));
   const off = Number(offset) || 0;
   let where = '1=1';
   const params = [];
@@ -732,9 +883,24 @@ app.post('/api/jobs/:id/bids', auth(['CARRIER']), writeLimiter, requireSeatRole(
   const driverPhone = normalizeUaeMobile(b.driverPhone);
   if (!driverPhone) return sendError(res, 400, 'driverPhone is required and must be a valid UAE mobile number');
 
-  const result = db
-    .prepare('INSERT INTO bids (job_id, carrier_id, amount_aed, eta_minutes, truck_type, driver_name, driver_phone, notes) VALUES (?,?,?,?,?,?,?,?)')
-    .run(job.id, req.user.id, amount, eta, b.truckType || null, b.driverName, driverPhone, b.notes || null);
+  // gstack review F5: without this a carrier could script unlimited bids on
+  // the same job (notification spam, price signaling). Checked proactively
+  // for a clean 409; idx_bids_one_pending_per_carrier (server/db.js) is the
+  // real guarantee against the race between this check and the insert.
+  const alreadyBidding = db.prepare(`SELECT 1 FROM bids WHERE job_id=? AND carrier_id=? AND status='PENDING'`).get(job.id, req.user.id);
+  if (alreadyBidding) return sendError(res, 409, 'You already have a pending bid on this job — withdraw it before placing another.');
+
+  let result;
+  try {
+    result = db
+      .prepare('INSERT INTO bids (job_id, carrier_id, amount_aed, eta_minutes, truck_type, driver_name, driver_phone, notes) VALUES (?,?,?,?,?,?,?,?)')
+      .run(job.id, req.user.id, amount, eta, b.truckType || null, b.driverName, driverPhone, b.notes || null);
+  } catch (e) {
+    if (e.code === 'ERR_SQLITE_ERROR' && /UNIQUE constraint failed/.test(e.message)) {
+      return sendError(res, 409, 'You already have a pending bid on this job — withdraw it before placing another.');
+    }
+    throw e;
+  }
   const bidId = Number(result.lastInsertRowid);
   writeAudit(req, { userId: req.actorId, action: 'BID_CREATE', details: `Bid AED ${amount} on ${job.job_code}`, entityType: 'bid', entityId: bidId });
   notify(job.shipper_id, 'New bid received', `${req.user.profile.company_name} bid AED ${amount} on ${job.job_code}.`, job.id);
@@ -844,6 +1010,21 @@ const TRANSITIONS = {
   CARRIER: { AWARDED: ['PICKED_UP', 'CANCELLED'], PICKED_UP: ['IN_TRANSIT'], IN_TRANSIT: ['DELIVERED'] },
 };
 
+// gstack review F7: admin previously got `{ [job.status]: [next] }` for its
+// transition table — i.e. whatever was requested was "allowed" by
+// definition, making the guard vacuous (any job could jump straight to
+// COMPLETED, which releases escrow). Admin now gets exactly what a
+// legitimate SHIPPER or CARRIER could have done on this job — real power to
+// unstick a job or force a status a party is refusing to set, without a
+// blank check to any status from any status.
+const ADMIN_TRANSITIONS = {};
+for (const roleMap of [TRANSITIONS.SHIPPER, TRANSITIONS.CARRIER]) {
+  for (const [from, tos] of Object.entries(roleMap)) {
+    ADMIN_TRANSITIONS[from] = [...new Set([...(ADMIN_TRANSITIONS[from] || []), ...tos])];
+  }
+}
+TRANSITIONS.ADMIN = ADMIN_TRANSITIONS;
+
 app.patch('/api/jobs/:id/status', auth(), requireSeatRole(['OPS']), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
@@ -854,7 +1035,7 @@ app.patch('/api/jobs/:id/status', auth(), requireSeatRole(['OPS']), (req, res) =
   if (!isShipperOwner && !isCarrierOwner && role !== 'ADMIN') return sendError(res, 403, 'Not a participant on this job');
   if (job.status === 'DISPUTED') return sendError(res, 403, 'Job is under dispute — escrow frozen');
 
-  const allowedFor = role === 'ADMIN' ? { [job.status]: [next] } : TRANSITIONS[role] || {};
+  const allowedFor = TRANSITIONS[role] || {};
   const allowedNext = allowedFor[job.status] || [];
   if (!allowedNext.includes(next)) return sendError(res, 403, `Illegal state transition: ${job.status} -> ${next}`);
 
@@ -1029,7 +1210,18 @@ app.post('/api/jobs/:id/rating', auth(), (req, res) => {
   if (!score || score < 1 || score > 5) return sendError(res, 400, 'score must be 1-5');
   const rateeId = req.user.id === job.shipper_id ? job.carrier_id : job.shipper_id;
 
-  db.prepare('INSERT INTO ratings (job_id, rater_id, ratee_id, score, comment) VALUES (?,?,?,?,?)').run(job.id, req.user.id, rateeId, score, b.comment || null);
+  // gstack review F13: the existence check above is racy under concurrent
+  // submits — idx_ratings_one_per_rater (server/db.js) is the real
+  // guarantee; this just turns a constraint violation into a clean 409
+  // instead of a 500.
+  try {
+    db.prepare('INSERT INTO ratings (job_id, rater_id, ratee_id, score, comment) VALUES (?,?,?,?,?)').run(job.id, req.user.id, rateeId, score, b.comment || null);
+  } catch (e) {
+    if (e.code === 'ERR_SQLITE_ERROR' && /UNIQUE constraint failed/.test(e.message)) {
+      return sendError(res, 409, 'You already rated this job');
+    }
+    throw e;
+  }
   const agg = db.prepare('SELECT AVG(score) avg, COUNT(*) n FROM ratings WHERE ratee_id=?').get(rateeId);
   db.prepare('UPDATE profiles SET rating_avg=?, completed_jobs=completed_jobs+1 WHERE user_id=?').run(Math.round(agg.avg * 100) / 100, rateeId);
   writeAudit(req, { userId: req.actorId, action: 'RATING', details: `${score}/5 on ${job.job_code}`, entityType: 'job', entityId: job.id });
@@ -1536,6 +1728,44 @@ const SEO_META = {
   '/compliance': { title: 'Compliance — Loadbyton', description: 'How Loadbyton handles personal data under UAE PDPL, VAT invoicing, and where account data is hosted.', slug: 'compliance' },
 };
 
+// gstack review F4: these previously fell through to the SPA catch-all,
+// so a crawler requesting either got a 200 of app-shell HTML instead of
+// directives/a URL list. Built from the request's own host rather than a
+// hardcoded domain, so this stays correct across environments (local,
+// staging, a future custom domain) without a config knob.
+function siteOrigin(req) {
+  return `${req.protocol}://${req.get('host')}`;
+}
+
+const PUBLIC_APP_PATHS_DISALLOWED = [
+  '/dashboard', '/open-loads', '/my-bids', '/won-jobs', '/earnings', '/jobs/', '/profile',
+  '/templates', '/contracts', '/notifications', '/admin', '/verify-email', '/reset-password', '/forgot-password',
+];
+
+app.get('/robots.txt', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=3600').type('text/plain').send(
+    [
+      'User-agent: *',
+      'Allow: /',
+      ...PUBLIC_APP_PATHS_DISALLOWED.map((p) => `Disallow: ${p}`),
+      '',
+      `Sitemap: ${siteOrigin(req)}/sitemap.xml`,
+      '',
+    ].join('\n')
+  );
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const origin = siteOrigin(req);
+  const urls = Object.keys(SEO_META)
+    .map((p) => `  <url><loc>${origin}${p}</loc></url>`)
+    .join('\n');
+  res
+    .set('Cache-Control', 'public, max-age=3600')
+    .type('application/xml')
+    .send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
+});
+
 // Reads once at boot rather than per-request — these files only ever
 // change on a fresh deploy (a new build), never while the process is
 // running, so there's no staleness risk from caching them in memory.
@@ -1581,10 +1811,13 @@ function renderSeoPage(res, meta) {
     html = html.replace('<div id="root"></div>', `<div id="root">${prerendered}</div>`);
   }
 
+  // gstack review F26, fixed independently on both branches — kept main's
   // no-cache (not no-store): still cacheable, but every load revalidates
   // against the ETag Express already attaches to res.send, so a repeat
-  // visitor gets a cheap 304 instead of skipping the request entirely
-  // while still always seeing the current build.
+  // visitor gets a cheap 304 instead of skipping the request entirely,
+  // while still always seeing the current build. HTML must never be cached
+  // long regardless — it's what points a repeat visitor at the *current*
+  // hashed asset filenames.
   res.status(200).set('Content-Type', 'text/html').set('Cache-Control', 'no-cache').send(html);
 }
 
@@ -1592,13 +1825,15 @@ if (fs.existsSync(DIST_DIR)) {
   app.use(
     express.static(DIST_DIR, {
       index: false,
+      // gstack review F26, fixed independently on both branches — kept
+      // main's version. Only /assets/* filenames are content-hashed by the
+      // Vite build (index-<hash>.js/.css) — a change in content is
+      // guaranteed to be a change in URL, so these can be cached forever.
+      // Everything else under dist (favicon.svg, brand/*.svg,
+      // __prerendered__/*) keeps express.static's own default (effectively
+      // no caching), since those filenames don't change when their content
+      // does.
       setHeaders(res, filePath) {
-        // Only /assets/* filenames are content-hashed by the Vite build
-        // (index-<hash>.js/.css) — a change in content is guaranteed to be a
-        // change in URL, so these can be cached forever. Everything else
-        // under dist (favicon.svg, brand/*.svg, __prerendered__/*) keeps
-        // express.static's own default (effectively no caching), since
-        // those filenames don't change when their content does.
         if (path.join(DIST_DIR, 'assets') === path.dirname(filePath)) {
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
@@ -1609,30 +1844,11 @@ if (fs.existsSync(DIST_DIR)) {
 
 app.get(['/', '/features', '/pricing', '/about', '/blog', '/security', '/compliance'], (req, res) => renderSeoPage(res, SEO_META[req.path]));
 
-// robots.txt / sitemap.xml previously fell through to the SPA catch-all
-// below and served index.html with a 200 — a search engine reads that as
-// "no crawl rules" / "no sitemap" rather than erroring, so the bug was
-// silent. SEO_META's keys are exactly the routes that get prerendered
-// markup, so the sitemap reuses that object instead of a second hardcoded
-// route list that could drift from it.
-app.get('/robots.txt', (req, res) => {
-  const origin = `${req.protocol}://${req.get('host')}`;
-  res
-    .set('Content-Type', 'text/plain; charset=utf-8')
-    .set('Cache-Control', 'public, max-age=3600')
-    .send(['User-agent: *', 'Allow: /', 'Disallow: /api/', '', `Sitemap: ${origin}/sitemap.xml`, ''].join('\n'));
-});
-
-app.get('/sitemap.xml', (req, res) => {
-  const origin = `${req.protocol}://${req.get('host')}`;
-  const urls = Object.keys(SEO_META)
-    .map((route) => `  <url><loc>${origin}${route}</loc></url>`)
-    .join('\n');
-  res
-    .set('Content-Type', 'application/xml; charset=utf-8')
-    .set('Cache-Control', 'public, max-age=3600')
-    .send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
-});
+// F4 was fixed independently on both branches — the /robots.txt and
+// /sitemap.xml handlers above (registered right after SEO_META) are the
+// surviving implementation; this branch's version disallows the
+// authenticated app routes specifically rather than a blanket `/api/`
+// only, which is the more precise crawl-budget signal.
 
 app.use('/api', (req, res) => sendError(res, 404, 'Not found'));
 
@@ -1651,7 +1867,21 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Loadbyton API listening on :${PORT}`);
-  console.log(`INTERNAL_KEY (for POST /api/system/auto-release): ${INTERNAL_KEY}`);
+  // gstack review F9: this used to print the actual secret to boot logs
+  // (which land in a log aggregator, not exactly a vault) and, since
+  // INTERNAL_KEY falls back to a fresh random value when the env var isn't
+  // set, silently rotated on every restart — anything relying on it (a
+  // cron hitting POST /api/system/auto-release) would break on redeploy
+  // with no signal why. The in-process setInterval sweep a few lines above
+  // already covers the actual product requirement every 10 minutes
+  // regardless of this endpoint; the env var only matters for an external
+  // trigger, so this is a loud warning, not a hard failure.
+  if (!process.env.INTERNAL_KEY) {
+    const level = process.env.NODE_ENV === 'production' ? 'WARNING' : 'note';
+    console.log(`[${level}] INTERNAL_KEY not set — generated a random one for this process only. It will change on every restart/redeploy. Set INTERNAL_KEY in the environment if anything external calls POST /api/system/auto-release.`);
+  } else {
+    console.log('INTERNAL_KEY is set from the environment.');
+  }
   require('./seed')();
 });
 

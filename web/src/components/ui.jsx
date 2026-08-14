@@ -70,7 +70,7 @@ const BADGE_COLORS = {
   warning: { background: 'var(--status-warning-bg)', color: 'var(--status-warning)' },
   danger: { background: 'var(--status-danger-bg)', color: 'var(--status-danger)' },
   info: { background: 'var(--status-info-bg)', color: 'var(--status-info)' },
-  accent: { background: 'var(--lb-orange-100)', color: 'var(--brand-accent)' },
+  accent: { background: 'var(--brand-accent-bg)', color: 'var(--brand-accent)' },
 };
 
 export function Badge({ color = 'neutral', dot = true, className, children }) {

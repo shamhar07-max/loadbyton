@@ -102,10 +102,15 @@ export default function Earnings() {
         )}
       </div>
 
+      {/* F18 (gstack review): this divided totals.paid (RELEASED payouts
+          only) by payouts.length (every payout, including PENDING) —
+          understating the true average per completed job. */}
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label="Paid out" value={formatAED(totals.paid)} tone="accent" />
         <Stat label="Pending" value={formatAED(totals.pending)} />
         <Stat label="Paid this month" value={formatAED(thisMonthPaid)} />
+        {/* F18, fixed independently on both branches — kept main's
+            precomputed releasedCount over this branch's inline filter. */}
         <Stat label="Avg per job" value={releasedCount > 0 ? formatAED(Math.round(totals.paid / releasedCount)) : '—'} />
       </div>
 

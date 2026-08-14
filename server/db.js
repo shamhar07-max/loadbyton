@@ -110,6 +110,12 @@ CREATE TABLE IF NOT EXISTS bids (
 );
 CREATE INDEX IF NOT EXISTS idx_bids_job ON bids(job_id);
 CREATE INDEX IF NOT EXISTS idx_bids_carrier ON bids(carrier_id);
+-- gstack review F5: a carrier could otherwise script unlimited bids on the
+-- same job (notification spam, price signaling). Partial, not a plain
+-- UNIQUE(job_id, carrier_id), so a carrier can still withdraw and re-bid —
+-- only one *live* (PENDING) bid per carrier per job is enforced; historical
+-- WITHDRAWN/REJECTED rows are unaffected.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bids_one_pending_per_carrier ON bids(job_id, carrier_id) WHERE status = 'PENDING';
 
 CREATE TABLE IF NOT EXISTS job_documents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,6 +148,9 @@ CREATE TABLE IF NOT EXISTS ratings (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ratings_job ON ratings(job_id);
+-- gstack review F13: the route already does a check-then-insert, but that's
+-- racy under concurrent submits — the schema is the actual guarantee.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ratings_one_per_rater ON ratings(job_id, rater_id);
 
 CREATE TABLE IF NOT EXISTS templates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -311,6 +320,15 @@ addColumn('audit_log', 'entity_id', 'entity_id INTEGER');
 addColumn('audit_log', 'before_state', 'before_state TEXT');
 addColumn('audit_log', 'after_state', 'after_state TEXT');
 addColumn('audit_log', 'request_id', 'request_id TEXT');
+
+// Email verification + password recovery (gstack review F3). Dark by
+// default — see server/lib/email.js — the token/expiry machinery is real
+// and fully wired regardless of whether an email provider is configured.
+addColumn('users', 'email_verified_at', 'email_verified_at TEXT');
+addColumn('users', 'email_verify_token_hash', 'email_verify_token_hash TEXT');
+addColumn('users', 'email_verify_expires', 'email_verify_expires TEXT');
+addColumn('users', 'password_reset_token_hash', 'password_reset_token_hash TEXT');
+addColumn('users', 'password_reset_expires', 'password_reset_expires TEXT');
 
 // ---------------------------------------------------------------------------
 // audit_log is append-only: DB triggers hard-abort UPDATE/DELETE. This makes
