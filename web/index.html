@@ -16,8 +16,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Loaded non-render-blocking (media=print, swapped to all in main.jsx) so a
          slow or unreachable font CDN never delays first paint of the app shell. -->
+    <!-- Noto Sans Arabic covers both display and body weights so the
+         Arabic locale never falls back to the browser's unstyled default
+         font next to the branded Latin type — see web/src/index.css
+         [lang="ar"] rule and web/src/lib/i18n.jsx. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap"
       rel="stylesheet"
       media="print"
       data-async-font

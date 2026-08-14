@@ -4,10 +4,12 @@ import { useAuth, roleHome } from '../lib/auth.jsx';
 import { ApiError } from '../lib/api.js';
 import { Button, Input, Label, Card } from '../components/ui.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
+import { useLocale } from '../lib/i18n.jsx';
 
 export default function Login() {
   usePageTitle('Log in');
   const { login } = useAuth();
+  const { t } = useLocale();
   const navigate = useNavigate();
   const location = useLocation();
   const [form, setForm] = useState({ email: '', password: '', totpCode: '' });
@@ -39,11 +41,11 @@ export default function Login() {
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('auth.email')}</Label>
             <Input id="email" type="email" required autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@company.ae" />
           </div>
           <div>
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t('auth.password')}</Label>
             <Input id="password" type="password" required autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" />
           </div>
           {needsMfa && (
@@ -57,7 +59,7 @@ export default function Login() {
               {error}
             </p>
           )}
-          <Button type="submit" className="w-full" loading={loading}>Log in</Button>
+          <Button type="submit" className="w-full" loading={loading}>{t('auth.login')}</Button>
         </form>
 
         <p className="mt-5 text-center text-sm text-ink-muted">

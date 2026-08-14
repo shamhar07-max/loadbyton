@@ -144,7 +144,17 @@ There's no automated test suite yet (`TODOS.md` TODO-1). To check a change:
 
 ## Known rough edges
 
-- No automated test suite yet — `TODOS.md` TODO-1 tracks building an isolated fresh-seed-per-run harness.
 - The in-process auto-release sweep requires at least one API request cadence.
-- Driver identity isn't yet bound to the bid (`bids.driver_name` is free text) — see TODO-2.
-- Payout release is a manual, founder-executed step with no enforced SLA tracker yet — see TODO-3.
+- **Arabic/RTL is infrastructure, not full coverage.** `lib/i18n.jsx` provides a real
+  `LocaleProvider` (dir=rtl switching, an Arabic font stack, localStorage-persisted,
+  same pattern as `theme` in `lib/auth.jsx`), wired into the highest-traffic surfaces
+  (`Shell.jsx` nav, `Landing.jsx` hero, `Login.jsx`/`Register.jsx`). Everything else —
+  Dashboard, JobDetail, Admin, Earnings, and most page bodies — is still English-only.
+  Extending coverage is mechanical (add a key to both dictionaries in `i18n.jsx`, swap
+  the literal string for `t('key')`) but has NOT been done for the rest of the app.
+  Don't say "the app supports Arabic" without qualifying which surfaces — that's the
+  exact class of overstatement the 2026-08-13 correction below exists to prevent.
+  Physical-direction Tailwind utilities (`ml-*`, `pl-*`, `text-left`, `border-l`) don't
+  auto-flip under `dir="rtl"` — only flex/grid main-axis layout does, natively, for
+  free. Any page you extend Arabic coverage to needs those swapped for logical
+  equivalents (`ms-*`/`ps-*`/`text-start`/`border-s`) as you touch it.

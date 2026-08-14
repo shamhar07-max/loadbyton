@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { formatLabel, TERMINALS, TERMINAL_INFO, EQUIPMENT_TYPES, equipmentLabel } from '../lib/constants.js';
 import { usePageTitle } from '../lib/seo.jsx';
+import { useLocale } from '../lib/i18n.jsx';
 import { IconShield, IconClock, IconMapPin, IconArrowRight, IconStar, IconTruck, IconPackage, IconTrailer, IconLayers, IconCompass } from '../components/icons.jsx';
 
 const EQUIPMENT_ICONS = {
@@ -13,6 +14,7 @@ const EQUIPMENT_ICONS = {
 
 export default function Landing() {
   usePageTitle('');
+  const { t } = useLocale();
   const [lanes, setLanes] = useState([]);
   const [carriers, setCarriers] = useState([]);
   const [market, setMarket] = useState(null);
@@ -30,23 +32,23 @@ export default function Landing() {
         <div className="container-page grid gap-12 py-16 lg:grid-cols-[1.05fr,0.95fr] lg:py-24">
           <div className="flex flex-col justify-center">
             <h1 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight text-ink md:text-5xl">
-              Move freight anywhere in the UAE without living in a WhatsApp thread.
+              {t('landing.hero.title')}
             </h1>
             <p className="mt-5 max-w-lg text-base leading-relaxed text-ink-secondary md:text-lg">
-              Post a job — a container, a flatbed load, a multi-truck delivery — get bids from verified carriers across four emirates, and hold the price in escrow until delivery is confirmed.
+              {t('landing.hero.subtitle')}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link to="/register" className="btn-accent px-6 py-3 text-base">
-                Post your first load <IconArrowRight size={18} />
+                {t('landing.hero.ctaShipper')} <IconArrowRight size={18} />
               </Link>
               <Link to="/register?role=CARRIER" className="btn-secondary px-6 py-3 text-base">
-                Bid as a carrier
+                {t('landing.hero.ctaCarrier')}
               </Link>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-ink-muted">
-              <span className="inline-flex items-center gap-1.5"><IconShield size={16} /> Verified carriers only</span>
-              <span className="inline-flex items-center gap-1.5"><IconClock size={16} /> Auto-released in {24}h</span>
-              <span className="inline-flex items-center gap-1.5"><IconCompass size={16} /> Dubai · Abu Dhabi · Sharjah · Fujairah</span>
+              <span className="inline-flex items-center gap-1.5"><IconShield size={16} /> {t('landing.hero.verified')}</span>
+              <span className="inline-flex items-center gap-1.5"><IconClock size={16} /> {t('landing.hero.autoRelease', 'Auto-released in {hours}h', { hours: 24 })}</span>
+              <span className="inline-flex items-center gap-1.5"><IconCompass size={16} /> {t('landing.hero.coverage')}</span>
             </div>
           </div>
 

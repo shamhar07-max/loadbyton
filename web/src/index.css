@@ -159,6 +159,16 @@ h1, h2, h3, h4, .font-display {
   font-family: 'Space Grotesk', ui-sans-serif, sans-serif;
 }
 
+/* Arabic locale: Space Grotesk/Inter have no Arabic glyphs, so without
+   this the whole app would silently fall back to the browser's unstyled
+   default font the moment dir="rtl" is set (see lib/i18n.jsx). Noto Sans
+   Arabic covers both display and body weight, keeping Arabic text
+   intentional rather than a fallback accident. */
+html[lang="ar"] body,
+html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, html[lang="ar"] .font-display {
+  font-family: 'Noto Sans Arabic', 'Inter', ui-sans-serif, sans-serif;
+}
+
 :focus-visible {
   outline: 2px solid var(--brand-secondary);
   outline-offset: 2px;

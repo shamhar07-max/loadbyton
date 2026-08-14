@@ -2,6 +2,30 @@
 
 Deferred / tracked follow-up work.
 
+## ✅ Resolved — 2026-08-14 corporate-readiness pass
+
+TODO-1 through TODO-4 below are closed as of this date (see git log for the
+commits). Kept in place, struck through in spirit, for the historical
+context on *why* each one mattered — the "why" sections below are still
+accurate background even though the "what" is now shipped.
+
+- **TODO-1** — `server/test/` (harness.js + core-loop.test.js + others),
+  isolated temp-DB-per-run, `npm test`, gated in CI (`.github/workflows/ci.yml`).
+- **TODO-2** — `bids.driver_phone` + `jobs.assigned_driver_name/_phone`,
+  bound at award, reassignment is its own audited action
+  (`PATCH /api/jobs/:id/driver`).
+- **TODO-3** — `payouts.sla_deadline` + `transfer_executed_at`, admin view
+  at `GET /api/admin/payouts-sla`, confirm via
+  `POST /api/admin/payouts/:id/mark-transferred`.
+- **TODO-4** — still genuinely not startable by code (Meta/Twilio provider
+  signup is an external, non-technical track). Left open below.
+
+Also shipped in the same pass, not originally tracked here: general API
+rate limiting (previously login-only), AES-256-GCM field encryption for
+IBAN/TRN, VAT invoice generation on payout release, multi-seat company
+accounts, and initial Arabic/RTL infrastructure (see `CLAUDE.md`'s "Known
+rough edges" for what that last one does and doesn't cover).
+
 ## TODO-1: Test-DB harness (isolated, fresh-seed-per-run)
 
 - **What:** Build an isolated test-DB harness (temp DB per run, fresh seed, npm test) so the

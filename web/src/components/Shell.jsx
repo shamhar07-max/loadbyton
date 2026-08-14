@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, roleHome } from '../lib/auth.jsx';
+import { useLocale } from '../lib/i18n.jsx';
 import { IconMenu, IconClose, IconBell, IconLogOut, IconUser, IconMoon, IconSun } from './icons.jsx';
 import { useToasts } from './Toast.jsx';
 
@@ -15,25 +16,31 @@ export function Logo({ dark = false, className = '' }) {
   );
 }
 
-const NAV_BY_ROLE = {
-  SHIPPER: [
-    { to: '/dashboard', label: 'Dashboard' },
-    { to: '/templates', label: 'Templates' },
-    { to: '/contracts', label: 'Contract lanes' },
-  ],
-  CARRIER: [
-    { to: '/open-loads', label: 'Open loads' },
-    { to: '/my-bids', label: 'My bids' },
-    { to: '/won-jobs', label: 'Won jobs' },
-    { to: '/earnings', label: 'Earnings' },
-  ],
-  ADMIN: [
-    { to: '/admin', label: 'Admin console' },
-  ],
-};
+// Nav labels are translated (see lib/i18n.jsx); every other page in the
+// app is still English-only — see the scope note at the top of i18n.jsx.
+function navByRole(t) {
+  return {
+    SHIPPER: [
+      { to: '/dashboard', label: t('nav.dashboard', 'Dashboard') },
+      { to: '/templates', label: t('nav.templates', 'Templates') },
+      { to: '/contracts', label: t('nav.contracts', 'Contract lanes') },
+    ],
+    CARRIER: [
+      { to: '/open-loads', label: t('nav.openLoads', 'Open loads') },
+      { to: '/my-bids', label: t('nav.myBids', 'My bids') },
+      { to: '/won-jobs', label: t('nav.wonJobs', 'Won jobs') },
+      { to: '/earnings', label: t('nav.earnings', 'Earnings') },
+    ],
+    ADMIN: [
+      { to: '/admin', label: t('nav.admin', 'Admin console') },
+    ],
+  };
+}
 
 export function Shell({ children }) {
   const { user, logout, theme, setTheme, walkthroughFinished, walkthroughStep, completeWalkthrough, setWalkthroughStep, endImpersonation, actingAs } = useAuth();
+  const { locale, setLocale, t } = useLocale();
+  const NAV_BY_ROLE = navByRole(t);
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -84,15 +91,23 @@ export function Shell({ children }) {
               ))}
               {!user && (
                 <>
-                  <NavLink key="features" to="/features" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>Features</NavLink>
-                  <NavLink key="pricing" to="/pricing" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>Pricing</NavLink>
-                  <NavLink key="about" to="/about" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>About</NavLink>
+                  <NavLink key="features" to="/features" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>{t('nav.features', 'Features')}</NavLink>
+                  <NavLink key="pricing" to="/pricing" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>{t('nav.pricing', 'Pricing')}</NavLink>
+                  <NavLink key="about" to="/about" className={({ isActive }) => (isActive ? 'nav-link-active' : 'nav-link')}>{t('nav.about', 'About')}</NavLink>
                 </>
               )}
             </nav>
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}
+              className="nav-link text-sm font-semibold"
+              aria-label={locale === 'ar' ? 'Switch to English' : 'التبديل إلى العربية'}
+              title={locale === 'ar' ? 'Switch to English' : 'التبديل إلى العربية'}
+            >
+              {locale === 'ar' ? 'EN' : 'ع'}
+            </button>
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="nav-link"
@@ -140,8 +155,8 @@ export function Shell({ children }) {
               </>
             ) : (
               <>
-                <Link to="/login" className="btn-ghost hidden sm:inline-flex">Log in</Link>
-                <Link to="/register" className="btn-primary">Get started</Link>
+                <Link to="/login" className="btn-ghost hidden sm:inline-flex">{t('nav.login', 'Log in')}</Link>
+                <Link to="/register" className="btn-primary">{t('nav.register', 'Get started')}</Link>
               </>
             )}
 
@@ -155,9 +170,9 @@ export function Shell({ children }) {
           <nav className="border-t px-5 py-3 md:hidden" style={{ borderColor: 'var(--border-default)' }}>
             <div className="flex flex-col gap-1">
               {(user ? navItems : [
-                { to: '/features', label: 'Features' },
-                { to: '/pricing', label: 'Pricing' },
-                { to: '/about', label: 'About' }
+                { to: '/features', label: t('nav.features', 'Features') },
+                { to: '/pricing', label: t('nav.pricing', 'Pricing') },
+                { to: '/about', label: t('nav.about', 'About') }
               ]).map((item) => (
                 <NavLink key={item.to} to={item.to} className="nav-link" onClick={() => setMobileOpen(false)}>
                   {item.label}

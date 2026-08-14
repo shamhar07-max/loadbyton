@@ -3,10 +3,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, roleHome } from '../lib/auth.jsx';
 import { Button, Input, Label, Card } from '../components/ui.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
+import { useLocale } from '../lib/i18n.jsx';
 
 export default function Register() {
   usePageTitle('Create your account');
   const { register } = useAuth();
+  const { t } = useLocale();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [role, setRole] = useState(params.get('role') === 'CARRIER' ? 'CARRIER' : 'SHIPPER');
@@ -45,23 +47,23 @@ export default function Register() {
               className="rounded-md px-3 py-2 text-sm font-medium transition-colors"
               style={role === r ? { background: 'var(--brand-primary)', color: 'var(--text-inverse)' } : { color: 'var(--text-secondary)' }}
             >
-              {r === 'SHIPPER' ? 'I ship freight' : 'I move freight'}
+              {r === 'SHIPPER' ? t('auth.roleShipper', 'I ship freight') : t('auth.roleCarrier', 'I move freight')}
             </button>
           ))}
         </div>
 
         <form onSubmit={onSubmit} className="mt-5 space-y-4">
           <div>
-            <Label htmlFor="companyName">Company name</Label>
+            <Label htmlFor="companyName">{t('auth.companyName')}</Label>
             <Input id="companyName" required value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} placeholder="Al-Majid Global Freight" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('auth.email')}</Label>
               <Input id="email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@company.ae" />
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('auth.password')}</Label>
               <Input id="password" type="password" required minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" />
             </div>
           </div>
@@ -95,7 +97,7 @@ export default function Register() {
               {error}
             </p>
           )}
-          <Button type="submit" className="w-full" loading={loading}>Create account</Button>
+          <Button type="submit" className="w-full" loading={loading}>{t('auth.register')}</Button>
         </form>
 
         <p className="mt-5 text-center text-sm text-ink-muted">
