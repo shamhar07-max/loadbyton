@@ -5,7 +5,7 @@ import { EQUIPMENT_TYPES, equipmentLabel } from '../lib/constants.js';
 import { usePageTitle } from '../lib/seo.jsx';
 import { useLocale } from '../lib/i18n.jsx';
 import { Reveal } from '../components/Reveal.jsx';
-import FreightNetworkAnimation from '../components/FreightNetworkAnimation.jsx';
+import FreightMotionScene from '../components/FreightMotionScene.jsx';
 import { IconShield, IconClock, IconArrowRight, IconStar, IconTruck, IconPackage, IconTrailer, IconLayers, IconCompass } from '../components/icons.jsx';
 
 const EQUIPMENT_ICONS = {
@@ -46,9 +46,9 @@ export default function Landing() {
 
   return (
     <div>
-      {/* Hero — split, not centered. Left: thesis. Right: an animated network
-          visual (FreightNetworkAnimation) representing the platform's
-          coverage across the four emirates, not a stock photo. */}
+      {/* Hero — split, not centered. Left: thesis. Right: an animated motion
+          scene (FreightMotionScene) — a truck driving a dusk highway with
+          the job lifecycle cycling above it — not a stock photo. */}
       <section className="border-b" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page grid gap-12 py-16 lg:grid-cols-[1.05fr,0.95fr] lg:py-24">
           <div className="flex flex-col justify-center">
@@ -81,16 +81,12 @@ export default function Landing() {
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ background: 'var(--lb-orange-500)' }} />
                     <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: 'var(--lb-orange-500)' }} />
                   </span>
-                  UAE freight network
+                  Shipment in motion
                 </p>
-                <span className="badge" style={{ background: 'rgba(242,96,12,0.2)', color: 'var(--lb-orange-500)' }}>4 emirates</span>
+                <span className="badge" style={{ background: 'rgba(242,96,12,0.2)', color: 'var(--lb-orange-500)' }}>Escrow-backed</span>
               </div>
 
-              {/* Hub-and-spoke network visual — see FreightNetworkAnimation.jsx
-                  for why this is the "poster" here instead of a literal map. */}
-              <div className="px-5 pb-2 pt-4">
-                <FreightNetworkAnimation />
-              </div>
+              <FreightMotionScene />
 
               <div className="grid grid-cols-3 gap-px px-5 py-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
                 {[

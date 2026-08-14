@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
 import { STATUS_FLOW, formatAED, formatDate, formatDateTime, formatLabel, EQUIPMENT_TYPES, CONTAINER_EQUIPMENT, equipmentLabel, TERMINALS, AREAS } from '../lib/constants.js';
 import { Button, Card, Input, Label, Select, Textarea, Badge, StatusBadge, EscrowBadge, Spinner, RatingPill } from '../components/ui.jsx';
-import { IconCheck, IconClock, IconMapPin, IconFile, IconMessage, IconStar, IconAlert } from '../components/icons.jsx';
+import { IconCheck, IconClock, IconMapPin, IconFile, IconMessage, IconStar, IconAlert, IconArrowLeft } from '../components/icons.jsx';
 import { useToasts } from '../components/Toast.jsx';
 import { fileToBase64, UPLOAD_ACCEPT, documentFileUrl } from '../lib/upload.js';
 import LocationPicker from '../components/LocationPicker.jsx';
@@ -66,6 +66,7 @@ function StatusStepper({ job }) {
 
 export default function JobDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [track, setTrack] = useState(null);
@@ -105,6 +106,17 @@ export default function JobDetail() {
   // PATCH /api/jobs/:id, which is the actual enforcement.
   const canEditJob = isShipper && job.status === 'OPEN' && !bids.some((b) => b.status === 'PENDING');
 
+  // Prefer real browser history (works correctly whether this job was
+  // reached from Dashboard, Open Loads, Won Jobs, My Bids, or Admin) — the
+  // idx check is how react-router's history state tells a fresh page load
+  // (arrived via a direct URL/refresh, no in-app history to go back to)
+  // apart from actual in-app navigation, so a direct link never "back"s
+  // the user out of the app entirely.
+  function goBack() {
+    if (window.history.state?.idx > 0) navigate(-1);
+    else navigate(user.role === 'CARRIER' ? '/open-loads' : '/dashboard');
+  }
+
   async function act(fn) {
     setBusy(true);
     setError('');
@@ -120,6 +132,13 @@ export default function JobDetail() {
 
   return (
     <div className="container-page py-10" dir="ltr">
+      <button
+        type="button"
+        onClick={goBack}
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-secondary hover:text-ink"
+      >
+        <IconArrowLeft size={16} /> Back
+      </button>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="font-mono text-xs text-ink-muted">{job.job_code}</p>
