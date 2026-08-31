@@ -4,6 +4,7 @@ import { usePageTitle } from '../lib/seo.jsx';
 import { TERMINALS, AREAS, formatAED, formatLabel } from '../lib/constants.js';
 import { Button, Card, Input, Label, Select, EmptyState, Badge } from '../components/ui.jsx';
 import { IconPlus, IconShield } from '../components/icons.jsx';
+import { useToasts } from '../components/Toast.jsx';
 
 const empty = { pickupTerminal: TERMINALS[0], deliveryArea: AREAS[0], deliveryAddress: '', monthlyLoads: '', targetPriceAed: '' };
 
@@ -13,6 +14,7 @@ export default function Contracts() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
+  const { addToast } = useToasts();
 
   function load() {
     api.listContracts().then((d) => setContracts(d.contracts)).catch(() => {});
@@ -27,6 +29,8 @@ export default function Contracts() {
       setForm(empty);
       setShowForm(false);
       load();
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not save contract lane', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -37,7 +41,7 @@ export default function Contracts() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Contract lanes</h1>
-          <p className="mt-1 text-sm text-ink-muted">Commit monthly volume on a lane for priority carrier visibility and a discounted rate.</p>
+          <p className="mt-1 text-sm text-ink-muted">Commit monthly volume on a lane: jobs sort ahead of spot jobs for carriers browsing, and get a 1% lower platform commission.</p>
         </div>
         <Button onClick={() => setShowForm((v) => !v)} className="self-start"><IconPlus size={16} /> New contract lane</Button>
       </div>

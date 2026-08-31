@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
-import { formatAED, formatDate, formatLabel, CONTAINER_EQUIPMENT, EQUIPMENT_TYPES, equipmentLabel } from '../lib/constants.js';
+import { formatAED, formatDate, formatLabel, CONTAINER_EQUIPMENT, EQUIPMENT_TYPES, equipmentLabel, CARGO_TYPES, cargoTypeLabel } from '../lib/constants.js';
 import { EmptyState, Badge, Select, Input, RatingPill, Pagination } from '../components/ui.jsx';
 import { IconAlert, IconMapPin, IconClock, IconChevronRight, IconPackage, IconSearch } from '../components/icons.jsx';
 
@@ -22,6 +22,7 @@ export default function OpenLoads() {
   const [jobs, setJobs] = useState(null);
   const [total, setTotal] = useState(0);
   const [equipmentFilter, setEquipmentFilter] = useState('all');
+  const [cargoFilter, setCargoFilter] = useState('all');
   const [sort, setSort] = useState('date_desc');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -34,15 +35,16 @@ export default function OpenLoads() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { setOffset(0); }, [equipmentFilter, sort, debouncedSearch]);
+  useEffect(() => { setOffset(0); }, [equipmentFilter, cargoFilter, sort, debouncedSearch]);
 
   useEffect(() => {
     setJobs(null);
     const params = { status: 'OPEN', sort, limit: PAGE_SIZE, offset };
     if (equipmentFilter !== 'all') params.equipmentType = equipmentFilter;
+    if (cargoFilter !== 'all') params.cargoType = cargoFilter;
     if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
     api.listJobs(params).then((d) => { setJobs(d.jobs); setTotal(d.total ?? d.jobs.length); }).catch(() => { setJobs([]); setTotal(0); });
-  }, [equipmentFilter, sort, debouncedSearch, offset]);
+  }, [equipmentFilter, cargoFilter, sort, debouncedSearch, offset]);
 
   return (
     <div className="container-page py-10" dir="ltr">
@@ -65,6 +67,10 @@ export default function OpenLoads() {
           <option value="all">Equipment: All</option>
           {EQUIPMENT_TYPES.map((t) => <option key={t} value={t}>{equipmentLabel(t)}</option>)}
         </Select>
+        <Select value={cargoFilter} onChange={(e) => setCargoFilter(e.target.value)} className="w-auto">
+          <option value="all">Cargo: All</option>
+          {CARGO_TYPES.map((t) => <option key={t} value={t}>{cargoTypeLabel(t)}</option>)}
+        </Select>
         <Select value={sort} onChange={(e) => setSort(e.target.value)} className="w-auto">
           {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </Select>
@@ -76,8 +82,8 @@ export default function OpenLoads() {
         ) : jobs.length === 0 ? (
           <EmptyState
             icon={<IconPackage size={28} />}
-            title={debouncedSearch || equipmentFilter !== 'all' ? 'No loads match these filters' : 'No open loads right now'}
-            description={debouncedSearch || equipmentFilter !== 'all' ? 'Try a broader search or clear a filter.' : 'New jobs post here as soon as a shipper creates them. Check back shortly.'}
+            title={debouncedSearch || equipmentFilter !== 'all' || cargoFilter !== 'all' ? 'No loads match these filters' : 'No open loads right now'}
+            description={debouncedSearch || equipmentFilter !== 'all' || cargoFilter !== 'all' ? 'Try a broader search or clear a filter.' : 'New jobs post here as soon as a shipper creates them. Check back shortly.'}
           />
         ) : (
           <>
@@ -90,6 +96,7 @@ export default function OpenLoads() {
                       <p className="mt-0.5 font-display text-base font-semibold text-ink">
                         {CONTAINER_EQUIPMENT.includes(j.equipment_type) ? `${j.container_size} · ${formatLabel(j.container_type)}` : equipmentLabel(j.equipment_type)}
                       </p>
+                      <p className="mt-0.5 text-xs text-ink-muted">{cargoTypeLabel(j.cargo_type)}</p>
                       <RatingPill rating={j.shipper_rating} className="mt-1" />
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
@@ -99,6 +106,7 @@ export default function OpenLoads() {
                           job that was both hazmat and reefer, or somehow had
                           both counts set, used to render only one badge when
                           either pair shared a single ternary. */}
+                      {!!j.contract_lane_id && <Badge color="accent">Contract lane</Badge>}
                       {!!j.requires_hazmat && <Badge color="warning">Hazmat</Badge>}
                       {!!j.requires_reefer && <Badge color="warning">Reefer</Badge>}
                       {j.container_count > 1 && <Badge color="accent">×{j.container_count} containers</Badge>}

@@ -103,24 +103,34 @@ module.exports = function seed() {
     console.log('Loadbyton: skipping demo ADMIN seed in production (set SEED_DEMO_ADMIN=1 to override).');
   }
 
+  // --- Contract lanes (created before jobs so job1 can be tied to one) ---
+  const contractLane1 = Number(
+    db
+      .prepare('INSERT INTO contract_lanes (shipper_id, pickup_terminal, delivery_area, delivery_address, monthly_loads, target_price_aed, status) VALUES (?,?,?,?,?,?,?)')
+      .run(shipperId, 'JEBEL_ALI_T2', 'JAFZA_SOUTH', 'JAFZA South, various warehouses', 40, 460, 'ACTIVE').lastInsertRowid
+  );
+  db.prepare('INSERT INTO contract_lanes (shipper_id, pickup_terminal, delivery_area, delivery_address, monthly_loads, target_price_aed, status) VALUES (?,?,?,?,?,?,?)').run(
+    shipperId, 'JEBEL_ALI_T1', 'AL_QUOZ', 'Al Quoz Industrial, various warehouses', 20, 900, 'ACTIVE'
+  );
+
   // --- Jobs --------------------------------------------------------------
   function insertJob(j) {
     const r = db
       .prepare(
-        `INSERT INTO jobs (job_code, shipper_id, carrier_id, container_size, container_type, container_number,
+        `INSERT INTO jobs (job_code, shipper_id, carrier_id, contract_lane_id, container_size, container_type, container_number,
            pickup_terminal, delivery_area, delivery_address, ready_at, deadline, max_budget_aed, agreed_price_aed,
            status, awarded_bid_id, requires_reefer, requires_hazmat, notes, free_time_days, demurrage_rate_aed,
            escrow_status, delivered_at, auto_release_processed, payout_released_at, created_at, updated_at,
-           equipment_type, container_count, truck_count)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+           equipment_type, cargo_type, container_count, truck_count)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
-        j.code, shipperId, j.carrierId || null, j.size, j.type, j.number || null,
+        j.code, shipperId, j.carrierId || null, j.contractLaneId || null, j.size, j.type, j.number || null,
         j.pickup, j.area, j.address, j.readyAt, j.deadline, j.budget || null, j.price || null,
         j.status, null, j.reefer ? 1 : 0, j.hazmat ? 1 : 0, j.notes || null, j.freeDays ?? 5, j.demurrageRate ?? 400,
         j.escrow, j.deliveredAt || null, j.autoReleased ? 1 : 0, j.payoutReleasedAt || null,
         j.createdAt || sqliteTime(-10 * DAY), sqliteTime(-1 * DAY),
-        j.equipment || 'CONTAINER_CHASSIS', j.containerCount ?? 1, j.truckCount ?? 1
+        j.equipment || 'CONTAINER_CHASSIS', j.cargoType || 'GENERAL_CARGO', j.containerCount ?? 1, j.truckCount ?? 1
       );
     return Number(r.lastInsertRowid);
   }
@@ -137,6 +147,7 @@ module.exports = function seed() {
     pickup: 'JEBEL_ALI_T2', area: 'JAFZA_SOUTH', address: 'Street 14, Warehouse 8B, JAFZA South, Dubai',
     readyAt: sqliteTime(1 * DAY), deadline: sqliteTime(4 * DAY), budget: 600, status: 'OPEN', escrow: 'PENDING',
     notes: 'Gate pass required — see message thread for customs contact.',
+    cargoType: 'GENERAL_CARGO', contractLaneId: contractLane1,
   });
   insertBid(job1, falconId, 500, 30, 'PENDING', 'Rashid Al Falasi', '3-axle flatbed');
   insertBid(job1, gulfheavyId, 480, 28, 'PENDING', 'Imran Sheikh', '3-axle flatbed');
@@ -157,7 +168,7 @@ module.exports = function seed() {
     code: 'LBT-DXB-2608-4933', size: '40FT', type: 'HAZMAT', number: 'TCLU5512309',
     pickup: 'JEBEL_ALI_T4', area: 'DUBAI_SOUTH', address: 'Plot 22, Dubai South Logistics District',
     readyAt: sqliteTime(1 * DAY), deadline: sqliteTime(3 * DAY), budget: 800, status: 'OPEN', escrow: 'PENDING',
-    hazmat: true, notes: 'Class 3 flammable liquid — placarding required.',
+    hazmat: true, notes: 'Class 3 flammable liquid — placarding required.', cargoType: 'HAZARDOUS_MATERIALS',
   });
   insertBid(job2, emiratesId, 750, 40, 'PENDING', 'Hamdan Youssef', 'Hazmat-certified flatbed');
 
@@ -166,7 +177,7 @@ module.exports = function seed() {
     code: 'LBT-DXB-2608-3810', size: '40HC', type: 'DRY', number: 'MSCU1147765',
     pickup: 'JEBEL_ALI_T1', area: 'AL_QUOZ', address: 'Al Quoz Industrial 3, Warehouse 14',
     readyAt: sqliteTime(-1 * DAY), deadline: sqliteTime(2 * DAY), price: 900, carrierId: emiratesId,
-    status: 'PICKED_UP', escrow: 'HELD',
+    status: 'PICKED_UP', escrow: 'HELD', cargoType: 'GENERAL_CARGO',
   });
   const job3Bid = insertBid(job3, emiratesId, 900, 50, 'ACCEPTED', 'Hamdan Youssef', '3-axle flatbed');
   db.prepare('UPDATE jobs SET awarded_bid_id=? WHERE id=?').run(job3Bid, job3);
@@ -179,7 +190,7 @@ module.exports = function seed() {
     pickup: 'JEBEL_ALI_T2', area: 'AL_QUOZ', address: 'Al Quoz Cold Chain Hub, Bay 6',
     readyAt: sqliteTime(-2 * DAY), deadline: sqliteTime(1 * DAY), price: 1600, carrierId: gulfheavyId,
     status: 'IN_TRANSIT', escrow: 'FUNDED', reefer: true, freeDays: 3, demurrageRate: 600,
-    notes: 'Maintain -18C chain of custody throughout.',
+    notes: 'Maintain -18C chain of custody throughout.', cargoType: 'PERISHABLE_FOOD',
   });
   const job4Bid = insertBid(job4, gulfheavyId, 1600, 65, 'ACCEPTED', 'Imran Sheikh', 'Reefer trailer');
   db.prepare('UPDATE jobs SET awarded_bid_id=? WHERE id=?').run(job4Bid, job4);
@@ -195,7 +206,7 @@ module.exports = function seed() {
     pickup: 'JEBEL_ALI_T2', area: 'JAFZA_SOUTH', address: 'JAFZA South, Warehouse 2C',
     readyAt: sqliteTime(-4 * DAY), deadline: sqliteTime(-1 * DAY), price: 520, carrierId: falconId,
     status: 'DELIVERED', escrow: 'RELEASED', deliveredAt: sqliteTime(-30 * HOUR), autoReleased: true,
-    payoutReleasedAt: sqliteTime(-6 * HOUR),
+    payoutReleasedAt: sqliteTime(-6 * HOUR), cargoType: 'PALLETIZED_BOXED',
   });
   const job5Bid = insertBid(job5, falconId, 520, 28, 'ACCEPTED', 'Rashid Al Falasi', '3-axle flatbed');
   db.prepare('UPDATE jobs SET awarded_bid_id=? WHERE id=?').run(job5Bid, job5);
@@ -211,7 +222,7 @@ module.exports = function seed() {
     pickup: 'JEBEL_ALI_T4', area: 'DUBAI_SOUTH', address: 'Dubai South Logistics District, Bay 9',
     readyAt: sqliteTime(-8 * DAY), deadline: sqliteTime(-5 * DAY), price: 1200, carrierId: emiratesId,
     status: 'COMPLETED', escrow: 'RELEASED', deliveredAt: sqliteTime(-6 * DAY), autoReleased: false,
-    payoutReleasedAt: sqliteTime(-6 * DAY),
+    payoutReleasedAt: sqliteTime(-6 * DAY), cargoType: 'GENERAL_CARGO',
   });
   const job6Bid = insertBid(job6, emiratesId, 1200, 60, 'ACCEPTED', 'Hamdan Youssef', '3-axle flatbed');
   db.prepare('UPDATE jobs SET awarded_bid_id=? WHERE id=?').run(job6Bid, job6);
@@ -230,7 +241,7 @@ module.exports = function seed() {
     pickup: 'PORT_KHALID', area: 'SHARJAH_INDUSTRIAL', address: 'Sharjah Industrial Area 12, Site Gate 4',
     readyAt: sqliteTime(1 * DAY), deadline: sqliteTime(2 * DAY), budget: 3200, status: 'OPEN', escrow: 'PENDING',
     notes: 'Aggregate haul from Port Khalid stockyard to site — 4 tripper loads across the day, same address.',
-    equipment: 'TRIPPER', truckCount: 4,
+    equipment: 'TRIPPER', truckCount: 4, cargoType: 'CONSTRUCTION_MATERIALS',
   });
   insertBid(job7, gulfheavyId, 3000, 35, 'PENDING', 'Imran Sheikh', 'TRIPPER');
   insertBid(job7, desertlineId, 2850, 45, 'PENDING', 'Yusuf Al Naqbi', 'TRIPPER');
@@ -243,26 +254,19 @@ module.exports = function seed() {
     pickup: 'FUJAIRAH_PORT', area: 'FUJAIRAH_FREEZONE', address: 'Fujairah Free Zone, Warehouse Cluster C',
     readyAt: sqliteTime(2 * DAY), deadline: sqliteTime(6 * DAY), budget: 4200, status: 'OPEN', escrow: 'PENDING',
     notes: 'Weekly restock — 6× 40FT dry containers, same lane, one award covers the full batch.',
-    equipment: 'CONTAINER_CHASSIS', containerCount: 6,
+    equipment: 'CONTAINER_CHASSIS', containerCount: 6, cargoType: 'PALLETIZED_BOXED',
   });
   insertBid(job8, emiratesId, 3900, 55, 'PENDING', 'Hamdan Youssef', 'CONTAINER_CHASSIS');
 
-  // --- Templates & contract lanes -----------------------------------------
+  // --- Templates -----------------------------------------------------------
   db.prepare(
-    `INSERT INTO templates (shipper_id, name, pickup_terminal, delivery_area, delivery_address, container_size, container_type, cadence, notes)
-     VALUES (?,?,?,?,?,?,?,?,?)`
-  ).run(shipperId, 'Weekly JAFZA South run', 'JEBEL_ALI_T2', 'JAFZA_SOUTH', 'Street 14, Warehouse 8B, JAFZA South, Dubai', '40HC', 'DRY', 'WEEKLY', 'Standing weekly lane — same warehouse as job 4921.');
+    `INSERT INTO templates (shipper_id, name, pickup_terminal, delivery_area, delivery_address, container_size, container_type, cargo_type, cadence, notes)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`
+  ).run(shipperId, 'Weekly JAFZA South run', 'JEBEL_ALI_T2', 'JAFZA_SOUTH', 'Street 14, Warehouse 8B, JAFZA South, Dubai', '40HC', 'DRY', 'GENERAL_CARGO', 'WEEKLY', 'Standing weekly lane — same warehouse as job 4921.');
   db.prepare(
-    `INSERT INTO templates (shipper_id, name, pickup_terminal, delivery_area, delivery_address, container_size, container_type, cadence, notes)
-     VALUES (?,?,?,?,?,?,?,?,?)`
-  ).run(shipperId, 'Monthly reefer to Al Quoz', 'JEBEL_ALI_T2', 'AL_QUOZ', 'Al Quoz Cold Chain Hub, Bay 6', 'REEFER', 'REEFER', 'MONTHLY', 'Maintain -18C chain of custody.');
-
-  db.prepare('INSERT INTO contract_lanes (shipper_id, pickup_terminal, delivery_area, delivery_address, monthly_loads, target_price_aed, status) VALUES (?,?,?,?,?,?,?)').run(
-    shipperId, 'JEBEL_ALI_T2', 'JAFZA_SOUTH', 'JAFZA South, various warehouses', 40, 460, 'ACTIVE'
-  );
-  db.prepare('INSERT INTO contract_lanes (shipper_id, pickup_terminal, delivery_area, delivery_address, monthly_loads, target_price_aed, status) VALUES (?,?,?,?,?,?,?)').run(
-    shipperId, 'JEBEL_ALI_T1', 'AL_QUOZ', 'Al Quoz Industrial, various warehouses', 20, 900, 'ACTIVE'
-  );
+    `INSERT INTO templates (shipper_id, name, pickup_terminal, delivery_area, delivery_address, container_size, container_type, cargo_type, cadence, notes)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`
+  ).run(shipperId, 'Monthly reefer to Al Quoz', 'JEBEL_ALI_T2', 'AL_QUOZ', 'Al Quoz Cold Chain Hub, Bay 6', 'REEFER', 'REEFER', 'PERISHABLE_FOOD', 'MONTHLY', 'Maintain -18C chain of custody.');
 
   // --- Notifications (a little history so the bell isn't empty) ----------
   db.prepare('INSERT INTO notifications (user_id, title, body, job_id) VALUES (?,?,?,?)').run(shipperId, 'New bid received', 'Falcon Container Express bid AED 500 on LBT-DXB-2608-4921.', job1);

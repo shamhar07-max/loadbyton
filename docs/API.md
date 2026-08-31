@@ -77,7 +77,9 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
 
 ### `POST /api/auth/mfa/disable`
 - **Auth:** session
+- **Body:** `{ code }` — required (current 6-digit TOTP code) if MFA is currently enabled; a session alone is no longer enough, so a hijacked session can't silently strip 2FA.
 - **200** `{ "ok": true }` — clears `mfa_enabled`/`mfa_secret`.
+- **401** if MFA is enabled and `code` is missing/wrong.
 
 ### `PATCH /api/profile`
 - **Auth:** session (any role)
@@ -108,16 +110,18 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
 
 ### `GET /api/jobs`
 - **Auth:** session (role-scoped)
-- **Query:** `?status=OPEN&limit=&offset=`
-- **200** `{ jobs: [...] }`
-  - SHIPPER → own jobs. CARRIER → `OPEN` jobs plus their own awarded/history. ADMIN → all.
+- **Query:** `?status=OPEN&limit=&offset=&equipmentType=&cargoType=&sort=&q=&mine=`
+- **200** `{ jobs: [...], total, limit, offset }`
+  - SHIPPER → own jobs. CARRIER → `OPEN` jobs plus their own awarded/history (or only their own with `mine=1`). ADMIN → all.
+  - `cargoType` filters to an exact `jobs.cargo_type` match, same validation/whitelist pattern as `equipmentType`.
+  - For a CARRIER browsing (not `mine=1`), jobs tied to an active contract lane (`contract_lane_id` set) sort ahead of spot jobs within whatever `sort` was requested — see `POST /api/jobs/:id/award` for the matching commission discount.
 
 ### `POST /api/jobs`
 - **Auth:** `SHIPPER`
 - **Body:**
   ```json
   {
-    "equipmentType": "CONTAINER_CHASSIS",
+    "equipmentType": "CONTAINER_CHASSIS", "cargoType": "GENERAL_CARGO",
     "containerSize": "40HC", "containerType": "DRY", "containerNumber": "MSKU9281745",
     "pickupTerminal": "JEBEL_ALI_T2", "deliveryArea": "JAFZA_SOUTH",
     "deliveryAddress": "Street 14, Warehouse 8B, JAFZA South, Dubai",
@@ -130,9 +134,13 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
     "deliveryLat": 25.1288, "deliveryLng": 55.2115, "deliveryAddressDetail": "Al Quoz Industrial 3, Warehouse 12"
   }
   ```
-  `equipmentType` defaults to `CONTAINER_CHASSIS` if omitted/invalid — one of the 12 values in `DATA_MODEL.md`'s `jobs.equipment_type`. `containerSize`/`containerType` are only validated (and required) when `equipmentType` is `CONTAINER_CHASSIS` or `REEFER_TRUCK`; for every other equipment type the server stores `'N/A'`/`'GENERAL'` regardless of what's sent, and `notes` becomes the required cargo description instead. `containerCount`/`truckCount` default to `1` — raise either for a volume inquiry (one job, one award, covering the stated batch).
+  `equipmentType` defaults to `CONTAINER_CHASSIS` if omitted/invalid — one of the 12 values in `DATA_MODEL.md`'s `jobs.equipment_type`. `containerSize`/`containerType` are only validated (and required) when `equipmentType` is `CONTAINER_CHASSIS` or `REEFER_TRUCK`; for every other equipment type the server stores `'N/A'`/`'GENERAL'` regardless of what's sent, and `notes` becomes the required cargo description instead. `containerCount`/`truckCount` default to `1` — raise either for a volume inquiry (one job, one award, covering the stated batch), capped at 1000. `maxBudgetAed`, if sent, must be a positive number up to 5,000,000.
+  `cargoType` defaults to `GENERAL_CARGO` if omitted/invalid — one of the 12 values in `DATA_MODEL.md`'s `jobs.cargo_type`, independent of `equipmentType` (what's inside vs. what's carrying it).
+  `contractLaneId`, if sent, must be an existing, active (`status='ACTIVE'`) contract lane owned by the calling shipper — **400** otherwise. See `contract_lanes` in `DATA_MODEL.md` for what it actually confers (priority sort + commission discount) since this build.
   `pickupLat`/`pickupLng`/`deliveryLat`/`deliveryLng` are an optional precise pin from the free OpenStreetMap+Nominatim picker (`web/src/components/LocationPicker.jsx`) on top of the required `pickupTerminal`/`deliveryArea` enums, which still drive lane rate lookups — **400** if only one of a lat/lng pair is sent, or the pair falls outside a loose UAE bounding box.
 - **201** `{ job }` with generated `job_code` (e.g. `LBT-DXB-2608-4921`), status `OPEN`.
+
+`PATCH /api/jobs/:id` (edit while `OPEN`, no pending bids) also accepts `cargoType` in its editable-field set, validated the same way.
 
 ### `POST /api/jobs/import`
 - **Auth:** `SHIPPER`
@@ -142,10 +150,11 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
 ### `GET /api/jobs/:id`
 - **Auth:** session (job participant, or admin; `OPEN` jobs visible to carriers)
 - **200** `{ job }` — job plus `bids[]`, `documents[]`, `messages[]`, `payout`. For a non-awarded `OPEN` job, competitor bids are masked (no amounts) until award — contact gating.
+- `documents[]` uses a stricter check than the job view itself: a carrier whose bid was `REJECTED`/`WITHDRAWN` loses document access (`canAccessJobDocuments` in `server/index.js`) even though they can still see the job existed and who won it. Same check gates `POST /api/jobs/:id/documents` and `GET /api/jobs/:id/documents/:docId/file`.
 
 ### `POST /api/jobs/:id/bids`
 - **Auth:** `CARRIER` **+ verified profile** + job `OPEN`
-- **Body:** `{ amountAed, etaMinutes (1–600), truckType, driverName, notes }` — `truckType` is free text (stored as-is); the client UI offers the 12 `equipment_type` values as a picklist defaulting to the job's own requirement, but the field isn't server-validated against that enum.
+- **Body:** `{ amountAed, etaMinutes (1–600), truckType, driverName, notes }` — `amountAed` must be positive and up to 5,000,000. `truckType` is free text (stored as-is); the client UI offers the 12 `equipment_type` values as a picklist defaulting to the job's own requirement, but the field isn't server-validated against that enum.
 - **201** `{ bid }`
 - **403** unverified carrier or job not open (`{ "error": "Carrier verification required to bid." }`).
 
@@ -171,6 +180,7 @@ Base URL: **`http://localhost:4000/api`** (dev: proxied at `/api` on `:5173`).
 - **Auth:** `SHIPPER`, job owner, job `OPEN`
 - **Body:** `{ bidId }`
 - **200** `{ ok: true, job }` — transactional award: job → `AWARDED` (legal from `OPEN`/`BIDDING`/`DRAFT`), bid → `ACCEPTED`, others → `REJECTED`, escrow → `HELD`, payout row created (gross/fee/net, `release_type=MANUAL`), audit entries, notifications.
+  - The fee in that payout row is `commission_rate_bps`, minus 100bps if the job is on an active contract lane, minus whatever of the carrier's `referral_credit_aed` balance is available (up to the fee itself) — that balance is spent and decremented in the same transaction, so it can't be reused on a later award.
 - **409** awarded concurrently; **404** bad bid.
 
 ### `PATCH /api/jobs/:id/status`
@@ -276,7 +286,7 @@ All routes below require `auth(['ADMIN'])`.
 - **200** `{ users: [{ id, email, role, is_verified, tier, created_at, profile: { company_name, completed_jobs, rating_avg } }] }` — every user on the platform (not just the unverified queue). The Members tab filters this list client-side by role/verified/search.
 
 ### `GET /api/admin/referrals`
-- **200** `{ referrals: [{ referredUserId, referredEmail, referredAt, referralCode, referrerId, referrerEmail, referrerCompany, fleetSize, status }] }` — every account that signed up with a referral code, joined to the referrer. `status` is `PENDING` or `CREDITED` (`CREDITED` once the referred account has a `COMPLETED` job) — it's derived, not a stored/toggleable flag.
+- **200** `{ referrals: [{ referredUserId, referredEmail, referredAt, referralCode, referrerId, referrerEmail, referrerCompany, fleetSize, status, bonusAed, referredCreditBalanceAed, referrerCreditBalanceAed }] }` — every account that signed up with a referral code, joined to the referrer. `status` is `PENDING` or `CREDITED`, backed by `users.referral_bonus_granted` — a real one-time ledger flag, not just derived from job count. `referredCreditBalanceAed`/`referrerCreditBalanceAed` are each side's current `referral_credit_aed` balance (see `DATA_MODEL.md` `users.referral_credit_aed`).
 
 ### `POST /api/admin/impersonate/:userId`
 - **200** `{ ok: true, user }` — starts impersonating the target (not another admin — **400** if it is). Issues a new, separate session for the target user tagged with the admin's id and capped at 30 minutes, and swaps the caller's cookie to it. Audited as `IMPERSONATE_START`.

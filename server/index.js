@@ -57,6 +57,9 @@ const apiLimiter = rateLimiter({ windowMs: 60 * 1000, max: 300, keyFn: byIp });
 app.use('/api', apiLimiter);
 const authLimiter = rateLimiter({ windowMs: 60 * 1000, max: 20, keyFn: byIp, message: 'Too many auth requests from this address. Try again shortly.' });
 app.use('/api/auth', authLimiter);
+// Applied to every state-changing route where the 300/min blanket apiLimiter
+// is 10x looser than warranted: job/bid create, award, status transitions,
+// dispute filing, template/contract creation, and org-seat creation.
 const writeLimiter = rateLimiter({ windowMs: 60 * 1000, max: 30, keyFn: byIp, message: 'Too many requests. Slow down and try again.' });
 
 // Dev CORS — a no-op in production, where the SPA is same-origin.
@@ -186,6 +189,37 @@ const EQUIPMENT_TYPES = [
 ];
 const CONTAINER_EQUIPMENT = ['CONTAINER_CHASSIS', 'REEFER_TRUCK'];
 
+// What's actually inside the truck/container, independent of the equipment
+// carrying it — a carrier scanning open loads needs to know this before
+// bidding (a curtain truck rated for palletised goods bids differently on a
+// job full of live animals or drums of liquid). Mirrored in
+// web/src/lib/constants.js; keep both lists in sync.
+const CARGO_TYPES = [
+  'GENERAL_CARGO', 'PALLETIZED_BOXED', 'CONSTRUCTION_MATERIALS', 'MACHINERY_EQUIPMENT',
+  'VEHICLES', 'DRY_BULK', 'LIQUID_BULK', 'LIVESTOCK', 'PERISHABLE_FOOD',
+  'HAZARDOUS_MATERIALS', 'DOCUMENTS_PARCELS', 'OTHER',
+];
+
+// Sane ceilings on numbers a client can submit — previously bid amount,
+// container/truck count, and max budget had a floor (or no check at all)
+// but no upper bound, so a client could submit a value that overflows the
+// UI's currency formatting or feeds an absurd number into estimateRate().
+// Not an attack surface (a shipper/carrier can only inflate their own job or
+// bid), but cheap to close and consistent with the existing etaMinutes
+// (1-600) bound.
+const MAX_BID_AMOUNT_AED = 5_000_000;
+const MAX_JOB_BUDGET_AED = 5_000_000;
+const MAX_UNIT_COUNT = 1000;
+
+// STRATEGY.md's contract-lane pitch to a shipper is "priority visibility +
+// discounted take-rate" — see the open-loads sort above for the visibility
+// half. This is the discount half: 100bps (1%) off the platform commission
+// for any job tied to an active contract lane, applied once at award. A
+// fixed platform-wide amount rather than a per-lane admin-configurable
+// field, to keep this shippable without also building the settings UI and
+// validation a configurable discount would need.
+const CONTRACT_LANE_DISCOUNT_BPS = 100;
+
 function getSettings() {
   const rows = db.prepare('SELECT key, value FROM settings').all();
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
@@ -209,6 +243,7 @@ function toPublicUser(row) {
     tier: row.tier,
     referral_code: row.referral_code,
     referred_by: row.referred_by,
+    referral_credit_aed: Number(row.referral_credit_aed) || 0,
     created_at: row.created_at,
     profile: profile
       ? {
@@ -261,6 +296,33 @@ function notifyAdmins(title, body, jobId = null, type = 'dispute') {
   for (const a of admins) notify(a.id, title, body, jobId, type);
 }
 
+// Referral program — STRATEGY.md promises "credit both sides," but
+// GET /api/admin/referrals only ever derived a display-only 'CREDITED'
+// label from "has the referred user completed a job?"; nothing anywhere
+// actually incremented a balance. referral_credit_aed is now a real ledger:
+// granted once (referral_bonus_granted guards against a second completed
+// job re-crediting the same pair) when a referred user's job reaches
+// COMPLETED — called for both job.shipper_id and job.carrier_id from the
+// status-transition handler, since either role can have been referred.
+// Carriers spend their balance automatically against their own platform fee
+// at award time (see POST /api/jobs/:id/award); a shipper's balance accrues
+// as a real, visible amount even though this app has no separate shipper
+// fee to discount against yet — an honest partial redemption, not a fake
+// "credited" badge with nothing behind it.
+const REFERRAL_BONUS_AED = 50;
+function grantReferralBonusIfDue(referredUserId) {
+  const referred = db.prepare('SELECT id, referred_by, referral_bonus_granted FROM users WHERE id=?').get(referredUserId);
+  if (!referred || !referred.referred_by || referred.referral_bonus_granted) return;
+  const referrer = db.prepare('SELECT id FROM users WHERE referral_code=?').get(referred.referred_by);
+  if (!referrer) return;
+  db.prepare('UPDATE users SET referral_bonus_granted=1 WHERE id=?').run(referred.id);
+  db.prepare('UPDATE users SET referral_credit_aed = referral_credit_aed + ? WHERE id=?').run(REFERRAL_BONUS_AED, referred.id);
+  db.prepare('UPDATE users SET referral_credit_aed = referral_credit_aed + ? WHERE id=?').run(REFERRAL_BONUS_AED, referrer.id);
+  writeAudit(null, { userId: referred.id, action: 'REFERRAL_BONUS', details: `AED ${REFERRAL_BONUS_AED} credited to both referred user #${referred.id} and referrer #${referrer.id}`, entityType: 'user', entityId: referred.id });
+  notify(referred.id, 'Referral bonus credited', `AED ${REFERRAL_BONUS_AED} credit added to your account.`, null, 'system');
+  notify(referrer.id, 'Referral bonus credited', `Your referral completed their first job — AED ${REFERRAL_BONUS_AED} credit added.`, null, 'system');
+}
+
 function isParticipantOrBidder(job, user) {
   if (user.role === 'ADMIN') return true;
   if (user.id === job.shipper_id) return true;
@@ -275,6 +337,27 @@ function isParticipantOrBidder(job, user) {
 function canViewJob(job, user) {
   if (isParticipantOrBidder(job, user)) return true;
   if (user.role === 'CARRIER' && job.status === 'OPEN') return true;
+  return false;
+}
+
+// Stricter than isParticipantOrBidder for documents specifically: that check
+// grants access to any carrier who ever placed a bid, including one whose
+// bid was REJECTED/WITHDRAWN at award time — which let a losing carrier
+// read (and add) POD photos, customs paperwork, and dispute evidence for a
+// job's entire lifetime, contradicting docs/STRATEGY.md's own public/private
+// matrix ("visible to the other party only after award"). A carrier keeps
+// document access only while they have a live bid (still eligible to win)
+// or are the shipper/awarded carrier/admin.
+function canAccessJobDocuments(job, user) {
+  if (user.role === 'ADMIN') return true;
+  if (user.id === job.shipper_id) return true;
+  if (user.id === job.carrier_id) return true;
+  if (user.role === 'CARRIER') {
+    const liveBid = db
+      .prepare(`SELECT 1 FROM bids WHERE job_id=? AND carrier_id=? AND status NOT IN ('REJECTED','WITHDRAWN')`)
+      .get(job.id, user.id);
+    if (liveBid) return true;
+  }
   return false;
 }
 
@@ -702,7 +785,18 @@ app.post('/api/auth/mfa/setup', auth(), (req, res) => {
   res.json({ ok: true, secret, otpauthUrl: totp.provisioningUrl(secret, req.actorLabel) });
 });
 
+// Requires the current TOTP code — previously any live session could strip
+// MFA with one call, so a session hijacked via XSS or a shared/unlocked
+// device could silently disable the victim's second factor. Proving current
+// possession of the authenticator before removing it closes that gap.
 app.post('/api/auth/mfa/disable', auth(), (req, res) => {
+  const actor = db.prepare('SELECT mfa_secret, mfa_enabled FROM users WHERE id=?').get(req.actorId);
+  if (actor?.mfa_enabled) {
+    const { code } = req.body || {};
+    if (!actor.mfa_secret || !totp.verifyCode(actor.mfa_secret, code)) {
+      return sendError(res, 401, 'Enter your current 2FA code to disable MFA');
+    }
+  }
   db.prepare('UPDATE users SET mfa_secret=NULL, mfa_enabled=0 WHERE id=?').run(req.actorId);
   writeAudit(req, { userId: req.actorId, action: 'MFA_DISABLE', entityType: 'user', entityId: req.actorId });
   res.json({ ok: true });
@@ -758,7 +852,7 @@ app.get('/api/org/members', auth(['SHIPPER', 'CARRIER']), (req, res) => {
   });
 });
 
-app.post('/api/org/members', auth(['SHIPPER', 'CARRIER']), requireSeatRole([]), (req, res) => {
+app.post('/api/org/members', auth(['SHIPPER', 'CARRIER']), writeLimiter, requireSeatRole([]), (req, res) => {
   const { email, password, seatRole, displayName } = req.body || {};
   if (!email || !password) return sendError(res, 400, 'email and password are required');
   if (!SEAT_ROLES.includes(seatRole)) return sendError(res, 422, `seatRole must be one of ${SEAT_ROLES.join(', ')}`);
@@ -915,7 +1009,7 @@ const JOB_SORT_COLUMNS = {
 };
 
 app.get('/api/jobs', auth(), (req, res) => {
-  const { status, limit, offset, mine, sort, q, equipmentType } = req.query;
+  const { status, limit, offset, mine, sort, q, equipmentType, cargoType } = req.query;
   // gstack review F12: negative limit passed through to SQLite's LIMIT
   // clause unclamped (LIMIT -1 means "no limit" in SQLite) — main's `mine`
   // param (F19, a different/better fix than the client-side limit:200 bump
@@ -950,6 +1044,10 @@ app.get('/api/jobs', auth(), (req, res) => {
     where += ' AND equipment_type = ?';
     params.push(equipmentType);
   }
+  if (cargoType && CARGO_TYPES.includes(cargoType)) {
+    where += ' AND cargo_type = ?';
+    params.push(cargoType);
+  }
   // Search — job code, delivery address, notes, terminal/area. LIKE against
   // a handful of TEXT columns is plenty at this table size; a real search
   // index would only start mattering at a scale this app isn't at yet.
@@ -958,7 +1056,17 @@ app.get('/api/jobs', auth(), (req, res) => {
     const needle = `%${q.trim()}%`;
     params.push(needle, needle, needle, needle, needle);
   }
-  const orderBy = JOB_SORT_COLUMNS[sort] || JOB_SORT_COLUMNS.date_desc;
+  let orderBy = JOB_SORT_COLUMNS[sort] || JOB_SORT_COLUMNS.date_desc;
+  // Contract-lane priority visibility (STRATEGY.md G6: "contract lanes get
+  // priority visibility") — previously contract_lane_id was stored on the
+  // job and never read back anywhere, so a shipper who committed to monthly
+  // volume got no actual benefit over a one-off spot job. Only applies to
+  // the browsing-for-bids view (a carrier looking at OPEN jobs, not their
+  // own won jobs) — a job tied to a lane sorts ahead of spot jobs within
+  // whatever sort the caller otherwise chose.
+  if (req.user.role === 'CARRIER' && !mine) {
+    orderBy = `(jobs.contract_lane_id IS NOT NULL) DESC, ${orderBy}`;
+  }
 
   // Total count for real pagination (page X of Y), not just "was there a
   // next page" — same WHERE, no LIMIT/OFFSET, params array cloned before
@@ -1007,8 +1115,30 @@ function createJobFromBody(b, req) {
     throw { status: 400, message: 'cargoDescription (notes) is required for non-container equipment' };
   }
 
-  const containerCount = Math.max(1, Number(b.containerCount) || 1);
-  const truckCount = Math.max(1, Number(b.truckCount) || 1);
+  const cargoType = CARGO_TYPES.includes(b.cargoType) ? b.cargoType : 'GENERAL_CARGO';
+
+  const containerCount = Math.min(MAX_UNIT_COUNT, Math.max(1, Number(b.containerCount) || 1));
+  const truckCount = Math.min(MAX_UNIT_COUNT, Math.max(1, Number(b.truckCount) || 1));
+
+  let maxBudgetAed = null;
+  if (b.maxBudgetAed !== undefined && b.maxBudgetAed !== null && b.maxBudgetAed !== '') {
+    const budget = Number(b.maxBudgetAed);
+    if (!Number.isFinite(budget) || budget <= 0 || budget > MAX_JOB_BUDGET_AED) {
+      throw { status: 400, message: `maxBudgetAed must be a positive number up to ${MAX_JOB_BUDGET_AED}` };
+    }
+    maxBudgetAed = budget;
+  }
+
+  // A contract lane confers real benefits now (priority sort in open loads,
+  // a discounted commission — see the award endpoint), so unlike a cosmetic
+  // label it has to actually belong to the posting shipper and still be
+  // active, or any shipper could attach someone else's lane id to their job.
+  let contractLaneId = null;
+  if (b.contractLaneId) {
+    const lane = db.prepare(`SELECT id FROM contract_lanes WHERE id=? AND shipper_id=? AND status='ACTIVE'`).get(b.contractLaneId, req.user.id);
+    if (!lane) throw { status: 400, message: 'contractLaneId not found, not yours, or not active' };
+    contractLaneId = lane.id;
+  }
 
   // Optional map pin (see LocationPicker.jsx) — reject silently-wrong values
   // rather than trusting whatever the client sends, same as any other field.
@@ -1030,14 +1160,14 @@ function createJobFromBody(b, req) {
     .prepare(
       `INSERT INTO jobs (job_code, shipper_id, contract_lane_id, template_id, container_size, container_type, container_number,
          pickup_terminal, delivery_area, delivery_address, ready_at, deadline, max_budget_aed, status, escrow_status,
-         requires_reefer, requires_hazmat, free_time_days, demurrage_rate_aed, notes, equipment_type, container_count, truck_count,
+         requires_reefer, requires_hazmat, free_time_days, demurrage_rate_aed, notes, equipment_type, cargo_type, container_count, truck_count,
          pickup_lat, pickup_lng, pickup_address_detail, delivery_lat, delivery_lng, delivery_address_detail)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'OPEN','PENDING',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'OPEN','PENDING',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     )
     .run(
       code,
       req.user.id,
-      b.contractLaneId || null,
+      contractLaneId,
       b.templateId || null,
       containerSize,
       containerType,
@@ -1047,13 +1177,14 @@ function createJobFromBody(b, req) {
       b.deliveryAddress,
       b.readyAt,
       b.deadline,
-      b.maxBudgetAed || null,
+      maxBudgetAed,
       b.requiresReefer ? 1 : 0,
       b.requiresHazmat ? 1 : 0,
       b.freeTimeDays ?? 5,
       b.demurrageRateAed ?? 400,
       b.notes || null,
       equipmentType,
+      cargoType,
       containerCount,
       truckCount,
       pickupLat,
@@ -1115,6 +1246,7 @@ const JOB_EDITABLE_FIELDS = {
   deliveryArea: 'delivery_area',
   deliveryAddress: 'delivery_address',
   containerNumber: 'container_number',
+  cargoType: 'cargo_type',
   readyAt: 'ready_at',
   deadline: 'deadline',
   maxBudgetAed: 'max_budget_aed',
@@ -1149,6 +1281,9 @@ app.patch('/api/jobs/:id', auth(['SHIPPER']), requireSeatRole(['OPS']), (req, re
   }
   if ((b.deliveryLat !== undefined || b.deliveryLng !== undefined) && !isValidUaeLatLng(Number(b.deliveryLat), Number(b.deliveryLng))) {
     return sendError(res, 400, 'deliveryLat/deliveryLng must be valid UAE coordinates');
+  }
+  if (b.cargoType !== undefined && !CARGO_TYPES.includes(b.cargoType)) {
+    return sendError(res, 400, 'Invalid cargoType');
   }
   const sets = [];
   const params = [];
@@ -1205,7 +1340,7 @@ app.get('/api/jobs/:id', auth(), (req, res) => {
   const shipperProfile = db.prepare('SELECT rating_avg FROM profiles WHERE user_id=?').get(job.shipper_id);
   const jobWithRating = { ...job, shipper_rating: shipperProfile ? shipperProfile.rating_avg : null };
 
-  const documents = isParticipantOrBidder(job, req.user) ? db.prepare('SELECT * FROM job_documents WHERE job_id=? ORDER BY created_at').all(job.id) : [];
+  const documents = canAccessJobDocuments(job, req.user) ? db.prepare('SELECT * FROM job_documents WHERE job_id=? ORDER BY created_at').all(job.id) : [];
   const payout = db.prepare('SELECT * FROM payouts WHERE job_id=?').get(job.id) || null;
   res.json({ job: jobWithRating, bids, documents, payout });
 });
@@ -1220,7 +1355,7 @@ app.post('/api/jobs/:id/bids', auth(['CARRIER']), writeLimiter, requireSeatRole(
   const b = req.body || {};
   const amount = Number(b.amountAed);
   const eta = Number(b.etaMinutes);
-  if (!amount || amount <= 0) return sendError(res, 400, 'amountAed must be a positive number');
+  if (!amount || amount <= 0 || amount > MAX_BID_AMOUNT_AED) return sendError(res, 400, `amountAed must be a positive number up to ${MAX_BID_AMOUNT_AED}`);
   if (!eta || eta < 1 || eta > 600) return sendError(res, 400, 'etaMinutes must be between 1 and 600');
   if (!b.driverName) return sendError(res, 400, 'driverName is required');
   const driverPhone = normalizeUaeMobile(b.driverPhone);
@@ -1280,7 +1415,7 @@ app.post('/api/jobs/:id/optimize-route', auth(), (req, res) => {
   res.json(result);
 });
 
-app.post('/api/jobs/:id/award', auth(['SHIPPER']), requireSeatRole(['OPS']), (req, res) => {
+app.post('/api/jobs/:id/award', auth(['SHIPPER']), writeLimiter, requireSeatRole(['OPS']), (req, res) => {
   const jobId = Number(req.params.id);
   const { bidId } = req.body || {};
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
@@ -1301,7 +1436,21 @@ app.post('/api/jobs/:id/award', auth(['SHIPPER']), requireSeatRole(['OPS']), (re
     }
     const { commission_rate_bps } = getSettings();
     const gross = bid.amount_aed;
-    const fee = Math.round((gross * commission_rate_bps) / 10000);
+    // Contract-lane discount — the other half of the priority-visibility +
+    // discounted-take-rate promise (see the open-loads sort comment above).
+    const effectiveRateBps = freshJob.contract_lane_id ? Math.max(0, commission_rate_bps - CONTRACT_LANE_DISCOUNT_BPS) : commission_rate_bps;
+    let fee = Math.round((gross * effectiveRateBps) / 10000);
+    // Referral credit — a real accrued balance (see grantReferralBonusIfDue)
+    // is spent here, up to what's available, straight off this carrier's own
+    // fee, and the balance is decremented immediately so it can't be spent
+    // twice across two different awards.
+    const carrierCredit = db.prepare('SELECT referral_credit_aed FROM users WHERE id=?').get(bid.carrier_id);
+    const creditAvailable = carrierCredit ? Number(carrierCredit.referral_credit_aed) || 0 : 0;
+    const creditApplied = Math.min(creditAvailable, fee);
+    if (creditApplied > 0) {
+      fee -= creditApplied;
+      db.prepare('UPDATE users SET referral_credit_aed = referral_credit_aed - ? WHERE id=?').run(creditApplied, bid.carrier_id);
+    }
     const net = gross - fee;
 
     db.prepare(
@@ -1368,7 +1517,7 @@ for (const roleMap of [TRANSITIONS.SHIPPER, TRANSITIONS.CARRIER]) {
 }
 TRANSITIONS.ADMIN = ADMIN_TRANSITIONS;
 
-app.patch('/api/jobs/:id/status', auth(), requireSeatRole(['OPS']), (req, res) => {
+app.patch('/api/jobs/:id/status', auth(), writeLimiter, requireSeatRole(['OPS']), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
   const { status: next } = req.body || {};
@@ -1393,6 +1542,10 @@ app.patch('/api/jobs/:id/status', auth(), requireSeatRole(['OPS']), (req, res) =
     db.prepare(`UPDATE payouts SET status='RELEASED', release_type='MANUAL', released_at=datetime('now'), sla_deadline=datetime('now', '+48 hours') WHERE job_id=?`).run(job.id);
     issueInvoice(db, job.id);
     notify(job.carrier_id, 'Funds on the way', `${job.job_code} was confirmed delivered. Payout released.`, job.id, 'payout');
+  }
+  if (next === 'COMPLETED') {
+    grantReferralBonusIfDue(job.shipper_id);
+    if (job.carrier_id) grantReferralBonusIfDue(job.carrier_id);
   }
 
   writeAudit(req, {
@@ -1500,7 +1653,7 @@ app.post('/api/jobs/:id/pod', auth(['CARRIER']), requireSeatRole(['OPS']), (req,
 // something to dispute (awarded through completed — not OPEN, which has no
 // counterparty commitment yet, and not already CANCELLED/DISPUTED).
 const DISPUTABLE_STATUSES = ['AWARDED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED'];
-app.post('/api/jobs/:id/dispute', auth(['SHIPPER', 'CARRIER']), requireSeatRole(['OPS']), (req, res) => {
+app.post('/api/jobs/:id/dispute', auth(['SHIPPER', 'CARRIER']), writeLimiter, requireSeatRole(['OPS']), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
   const isShipperOwner = req.user.role === 'SHIPPER' && job.shipper_id === req.user.id;
@@ -1625,7 +1778,7 @@ app.get('/api/jobs/:id/backload-matches', auth(['CARRIER']), (req, res) => {
 app.post('/api/jobs/:id/documents', auth(), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
-  if (!isParticipantOrBidder(job, req.user)) return sendError(res, 403, 'Not permitted');
+  if (!canAccessJobDocuments(job, req.user)) return sendError(res, 403, 'Not permitted');
   const b = req.body || {};
   if (!b.title || !(b.fileUrl || b.fileBase64)) return sendError(res, 400, 'title and (fileUrl or fileBase64+mimeType) are required');
   let storagePath = null;
@@ -1650,14 +1803,15 @@ app.post('/api/jobs/:id/documents', auth(), (req, res) => {
   res.status(201).json({ ok: true });
 });
 
-// Access-controlled file serving: reuses the exact isParticipantOrBidder
-// check every other job-scoped route uses, so an uploaded POD/customs doc
-// is only readable by the job's shipper, carrier, or a bidding carrier (or
-// admin) — never a bare guessable URL.
+// Access-controlled file serving: uses canAccessJobDocuments (stricter than
+// isParticipantOrBidder — excludes REJECTED/WITHDRAWN bidders), so an
+// uploaded POD/customs doc is only readable by the job's shipper, carrier,
+// a carrier with a still-live bid, or admin — never a bare guessable URL,
+// and never by a carrier who already lost the award.
 app.get('/api/jobs/:id/documents/:docId/file', auth(), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(req.params.id);
   if (!job) return sendError(res, 404, 'Job not found');
-  if (!isParticipantOrBidder(job, req.user)) return sendError(res, 403, 'Not permitted');
+  if (!canAccessJobDocuments(job, req.user)) return sendError(res, 403, 'Not permitted');
   const doc = db.prepare('SELECT * FROM job_documents WHERE id=? AND job_id=?').get(req.params.docId, job.id);
   if (!doc) return sendError(res, 404, 'Document not found');
   if (!doc.storage_path) return res.redirect(doc.file_url);
@@ -1731,22 +1885,23 @@ app.get('/api/templates', auth(['SHIPPER']), (req, res) => {
   res.json({ templates });
 });
 
-app.post('/api/templates', auth(['SHIPPER']), (req, res) => {
+app.post('/api/templates', auth(['SHIPPER']), writeLimiter, (req, res) => {
   const b = req.body || {};
   if (!b.name || !b.pickupTerminal || !b.deliveryArea || !b.deliveryAddress || !b.containerSize) {
     return sendError(res, 400, 'name, pickupTerminal, deliveryArea, deliveryAddress and containerSize are required');
   }
+  const cargoType = CARGO_TYPES.includes(b.cargoType) ? b.cargoType : 'GENERAL_CARGO';
   const result = db
     .prepare(
-      `INSERT INTO templates (shipper_id, name, pickup_terminal, delivery_area, delivery_address, container_size, container_type, cadence, notes)
-       VALUES (?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO templates (shipper_id, name, pickup_terminal, delivery_area, delivery_address, container_size, container_type, cargo_type, cadence, notes)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`
     )
-    .run(req.user.id, b.name, b.pickupTerminal, b.deliveryArea, b.deliveryAddress, b.containerSize, b.containerType || 'DRY', b.cadence || 'ONCE', b.notes || null);
+    .run(req.user.id, b.name, b.pickupTerminal, b.deliveryArea, b.deliveryAddress, b.containerSize, b.containerType || 'DRY', cargoType, b.cadence || 'ONCE', b.notes || null);
   const template = db.prepare('SELECT * FROM templates WHERE id=?').get(Number(result.lastInsertRowid));
   res.status(201).json({ template });
 });
 
-app.post('/api/templates/:id/rerun', auth(['SHIPPER']), (req, res) => {
+app.post('/api/templates/:id/rerun', auth(['SHIPPER']), writeLimiter, (req, res) => {
   const tpl = db.prepare('SELECT * FROM templates WHERE id=? AND shipper_id=?').get(req.params.id, req.user.id);
   if (!tpl) return sendError(res, 404, 'Template not found');
   let code = jobCode();
@@ -1755,11 +1910,11 @@ app.post('/api/templates/:id/rerun', auth(['SHIPPER']), (req, res) => {
   const deadline = new Date(Date.now() + 4 * 24 * 3600 * 1000).toISOString();
   const result = db
     .prepare(
-      `INSERT INTO jobs (job_code, shipper_id, template_id, container_size, container_type, pickup_terminal, delivery_area, delivery_address,
+      `INSERT INTO jobs (job_code, shipper_id, template_id, container_size, container_type, cargo_type, pickup_terminal, delivery_area, delivery_address,
          ready_at, deadline, status, escrow_status, notes)
-       VALUES (?,?,?,?,?,?,?,?,?,?,'OPEN','PENDING',?)`
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,'OPEN','PENDING',?)`
     )
-    .run(code, req.user.id, tpl.id, tpl.container_size, tpl.container_type, tpl.pickup_terminal, tpl.delivery_area, tpl.delivery_address, readyAt, deadline, tpl.notes);
+    .run(code, req.user.id, tpl.id, tpl.container_size, tpl.container_type, tpl.cargo_type, tpl.pickup_terminal, tpl.delivery_area, tpl.delivery_address, readyAt, deadline, tpl.notes);
   writeAudit(req, { userId: req.actorId, action: 'JOB_CREATE', details: `${code} posted from template "${tpl.name}"`, entityType: 'job', entityId: Number(result.lastInsertRowid) });
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(Number(result.lastInsertRowid));
   res.status(201).json({ job });
@@ -1770,7 +1925,7 @@ app.get('/api/contracts', auth(['SHIPPER']), (req, res) => {
   res.json({ contracts });
 });
 
-app.post('/api/contracts', auth(['SHIPPER']), (req, res) => {
+app.post('/api/contracts', auth(['SHIPPER']), writeLimiter, (req, res) => {
   const b = req.body || {};
   if (!b.pickupTerminal || !b.deliveryArea || !b.deliveryAddress || !b.monthlyLoads) {
     return sendError(res, 400, 'pickupTerminal, deliveryArea, deliveryAddress and monthlyLoads are required');
@@ -2024,8 +2179,8 @@ app.get('/api/admin/users', auth(['ADMIN']), (req, res) => {
 app.get('/api/admin/referrals', auth(['ADMIN']), (req, res) => {
   const rows = db
     .prepare(
-      `SELECT referred.id, referred.email, referred.created_at, referred.referred_by,
-              referrer.id AS referrer_id, referrer.email AS referrer_email, referrerProfile.company_name AS referrer_company,
+      `SELECT referred.id, referred.email, referred.created_at, referred.referred_by, referred.referral_bonus_granted, referred.referral_credit_aed AS referred_credit_aed,
+              referrer.id AS referrer_id, referrer.email AS referrer_email, referrerProfile.company_name AS referrer_company, referrer.referral_credit_aed AS referrer_credit_aed,
               referredProfile.fleet_size AS fleet_size,
               (SELECT COUNT(*) FROM jobs WHERE (jobs.shipper_id = referred.id OR jobs.carrier_id = referred.id) AND jobs.status = 'COMPLETED') AS referred_completed_jobs
        FROM users referred
@@ -2046,9 +2201,13 @@ app.get('/api/admin/referrals', auth(['ADMIN']), (req, res) => {
       referrerEmail: r.referrer_email,
       referrerCompany: r.referrer_company,
       fleetSize: r.fleet_size,
-      // Bonus only actually credits once the referred account completes a job —
-      // status here reflects that, it isn't a stored/toggleable flag.
-      status: r.referred_completed_jobs > 0 ? 'CREDITED' : 'PENDING',
+      // referral_bonus_granted is a real, one-time-set ledger flag (see
+      // grantReferralBonusIfDue) — both sides' referral_credit_aed actually
+      // moved when this flipped, not just a derived display label.
+      status: r.referral_bonus_granted ? 'CREDITED' : 'PENDING',
+      bonusAed: REFERRAL_BONUS_AED,
+      referredCreditBalanceAed: r.referred_credit_aed,
+      referrerCreditBalanceAed: r.referrer_credit_aed,
     })),
   });
 });
@@ -2118,6 +2277,11 @@ app.post('/api/admin/disputes', auth(['ADMIN']), (req, res) => {
   const job = db.prepare('SELECT * FROM jobs WHERE id=?').get(jobId);
   if (!job) return sendError(res, 404, 'Job not found');
   if (!reason) return sendError(res, 400, 'reason is required');
+  // The self-serve route (POST /api/jobs/:id/dispute) enforces this; this
+  // admin-initiated path didn't, so an admin could re-dispute a job that's
+  // already DISPUTED (or one that never reached an awardable state) and
+  // silently stomp its status/escrow. Same allow-list, same reasoning.
+  if (!DISPUTABLE_STATUSES.includes(job.status)) return sendError(res, 403, `Cannot dispute a job in ${job.status} status`);
 
   const result = db.prepare('INSERT INTO disputes (job_id, opened_by, reason, status) VALUES (?,?,?,\'OPEN\')').run(job.id, req.user.id, reason);
   db.prepare(`UPDATE jobs SET status='DISPUTED', escrow_status='DISPUTED', updated_at=datetime('now') WHERE id=?`).run(job.id);
@@ -2143,6 +2307,8 @@ app.post('/api/admin/disputes/:id/resolve', auth(['ADMIN']), (req, res) => {
     issueInvoice(db, job.id);
   }
   db.prepare(`UPDATE jobs SET status='COMPLETED', escrow_status='RELEASED', payout_released_at=datetime('now'), updated_at=datetime('now') WHERE id=?`).run(job.id);
+  grantReferralBonusIfDue(job.shipper_id);
+  if (job.carrier_id) grantReferralBonusIfDue(job.carrier_id);
   db.prepare(`UPDATE disputes SET status='RESOLVED', determination=?, decision=?, resolved_by=?, resolved_at=datetime('now') WHERE id=?`).run(
     determination || null,
     decision,

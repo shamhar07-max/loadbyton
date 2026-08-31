@@ -5,7 +5,7 @@ import { useAuth } from '../lib/auth.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
 import {
   CONTAINER_SIZES, CONTAINER_TYPES, TERMINALS, AREAS, EQUIPMENT_TYPES, CONTAINER_EQUIPMENT, STATUS_FLOW,
-  equipmentLabel, formatAED, formatDate, formatLabel,
+  CARGO_TYPES, equipmentLabel, cargoTypeLabel, formatAED, formatDate, formatLabel,
 } from '../lib/constants.js';
 import { Button, Card, Stat, Input, Label, Select, Textarea, EmptyState, StatusBadge, Badge, RatingPill, Pagination } from '../components/ui.jsx';
 import { IconPlus, IconPackage, IconChevronRight, IconSearch, IconUpload, IconDownload, IconCheck, IconX } from '../components/icons.jsx';
@@ -23,10 +23,10 @@ const SORT_OPTIONS = [
 ];
 
 const emptyJob = {
-  equipmentType: 'CONTAINER_CHASSIS',
+  equipmentType: 'CONTAINER_CHASSIS', cargoType: 'GENERAL_CARGO',
   containerSize: '40HC', containerType: 'DRY', containerNumber: '', pickupTerminal: TERMINALS[0], deliveryArea: AREAS[0],
   deliveryAddress: '', readyAt: '', deadline: '', maxBudgetAed: '', requiresReefer: false, requiresHazmat: false, notes: '',
-  containerCount: 1, truckCount: 1, pickupLocation: null, deliveryLocation: null,
+  containerCount: 1, truckCount: 1, pickupLocation: null, deliveryLocation: null, contractLaneId: '',
 };
 
 export default function Dashboard() {
@@ -36,6 +36,7 @@ export default function Dashboard() {
   const [jobs, setJobs] = useState(null);
   const [jobsTotal, setJobsTotal] = useState(0);
   const [templates, setTemplates] = useState([]);
+  const [activeContracts, setActiveContracts] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState(emptyJob);
@@ -58,6 +59,7 @@ export default function Dashboard() {
   function loadStats() {
     api.analytics().then((d) => setAnalytics(d.analytics)).catch(() => {});
     api.listTemplates().then((d) => setTemplates(d.templates.slice(0, 3))).catch(() => {});
+    api.listContracts().then((d) => setActiveContracts((d.contracts || []).filter((c) => c.status === 'ACTIVE'))).catch(() => {});
   }
   function loadJobs() {
     const params = { sort, limit: PAGE_SIZE, offset };
@@ -85,6 +87,7 @@ export default function Dashboard() {
         maxBudgetAed: form.maxBudgetAed ? Number(form.maxBudgetAed) : undefined,
         containerCount: Number(form.containerCount) || 1,
         truckCount: Number(form.truckCount) || 1,
+        contractLaneId: form.contractLaneId ? Number(form.contractLaneId) : undefined,
         pickupLat: form.pickupLocation?.lat,
         pickupLng: form.pickupLocation?.lng,
         pickupAddressDetail: form.pickupLocation?.address,
@@ -179,6 +182,25 @@ export default function Dashboard() {
                   </div>
                 </>
               ) : null}
+              <div>
+                <Label>Cargo type</Label>
+                <Select value={form.cargoType} onChange={(e) => setForm({ ...form, cargoType: e.target.value })}>
+                  {CARGO_TYPES.map((t) => <option key={t} value={t}>{cargoTypeLabel(t)}</option>)}
+                </Select>
+                <p className="mt-1 text-xs text-ink-muted">What's actually being moved — helps a carrier judge the job before bidding.</p>
+              </div>
+              {activeContracts.length > 0 && (
+                <div>
+                  <Label>Contract lane (optional)</Label>
+                  <Select value={form.contractLaneId} onChange={(e) => setForm({ ...form, contractLaneId: e.target.value })}>
+                    <option value="">None — one-off spot job</option>
+                    {activeContracts.map((c) => (
+                      <option key={c.id} value={c.id}>{formatLabel(c.pickup_terminal)} → {formatLabel(c.delivery_area)} ({c.monthly_loads}/mo)</option>
+                    ))}
+                  </Select>
+                  <p className="mt-1 text-xs text-ink-muted">Jobs on a committed lane get priority visibility to carriers and a discounted commission.</p>
+                </div>
+              )}
               <div>
                 <Label>Pickup terminal</Label>
                 <Select value={form.pickupTerminal} onChange={(e) => setForm({ ...form, pickupTerminal: e.target.value })}>
