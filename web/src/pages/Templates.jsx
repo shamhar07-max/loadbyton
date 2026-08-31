@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { usePageTitle } from '../lib/seo.jsx';
-import { CONTAINER_SIZES, CONTAINER_TYPES, TERMINALS, AREAS, formatLabel } from '../lib/constants.js';
+import { CONTAINER_SIZES, CONTAINER_TYPES, TERMINALS, AREAS, CARGO_TYPES, cargoTypeLabel, formatLabel } from '../lib/constants.js';
 import { Button, Card, Input, Label, Select, Textarea, EmptyState, Badge } from '../components/ui.jsx';
 import { IconPlus, IconPackage } from '../components/icons.jsx';
+import { useToasts } from '../components/Toast.jsx';
 
-const empty = { name: '', pickupTerminal: TERMINALS[0], deliveryArea: AREAS[0], deliveryAddress: '', containerSize: '40HC', containerType: 'DRY', cadence: 'WEEKLY', notes: '' };
+const empty = { name: '', pickupTerminal: TERMINALS[0], deliveryArea: AREAS[0], deliveryAddress: '', containerSize: '40HC', containerType: 'DRY', cargoType: 'GENERAL_CARGO', cadence: 'WEEKLY', notes: '' };
 
 export default function Templates() {
   usePageTitle('Templates');
@@ -14,6 +15,7 @@ export default function Templates() {
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
   const [rerunning, setRerunning] = useState(null);
+  const { addToast } = useToasts();
 
   function load() {
     api.listTemplates().then((d) => setTemplates(d.templates)).catch(() => {});
@@ -28,6 +30,8 @@ export default function Templates() {
       setForm(empty);
       setShowForm(false);
       load();
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not save template', body: err.message });
     } finally {
       setBusy(false);
     }
@@ -38,6 +42,8 @@ export default function Templates() {
     try {
       const { job } = await api.rerunTemplate(id);
       window.location.href = `/jobs/${job.id}`;
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not re-run template', body: err.message });
     } finally {
       setRerunning(null);
     }
@@ -90,6 +96,12 @@ export default function Templates() {
                 </Select>
               </div>
               <div>
+                <Label>Cargo type</Label>
+                <Select value={form.cargoType} onChange={(e) => setForm({ ...form, cargoType: e.target.value })}>
+                  {CARGO_TYPES.map((t) => <option key={t} value={t}>{cargoTypeLabel(t)}</option>)}
+                </Select>
+              </div>
+              <div>
                 <Label>Cadence</Label>
                 <Select value={form.cadence} onChange={(e) => setForm({ ...form, cadence: e.target.value })}>
                   {['ONCE', 'WEEKLY', 'BIWEEKLY', 'MONTHLY'].map((c) => <option key={c} value={c}>{formatLabel(c)}</option>)}
@@ -120,7 +132,7 @@ export default function Templates() {
                   <Badge>{formatLabel(t.cadence)}</Badge>
                 </div>
                 <p className="mt-2 text-sm text-ink-secondary">{formatLabel(t.pickup_terminal)} → {formatLabel(t.delivery_area)}</p>
-                <p className="mt-0.5 text-xs text-ink-muted">{t.container_size} · {formatLabel(t.container_type)}</p>
+                <p className="mt-0.5 text-xs text-ink-muted">{t.container_size} · {formatLabel(t.container_type)} · {cargoTypeLabel(t.cargo_type)}</p>
                 <Button className="mt-4 w-full" variant="secondary" onClick={() => rerun(t.id)} loading={rerunning === t.id}>Re-run</Button>
               </Card>
             ))}

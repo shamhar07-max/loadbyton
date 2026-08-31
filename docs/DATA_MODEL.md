@@ -44,6 +44,8 @@ Identity + account attributes.
 | `tier` | TEXT NOT NULL | loyalty: `BRONZE` \| `SILVER` \| `GOLD` |
 | `referral_code` | TEXT UNIQUE | shareable referral |
 | `referred_by` | TEXT | code of the referrer |
+| `referral_credit_aed` | REAL | default 0 (migration-added) — real accrued balance, not a display label. Granted `REFERRAL_BONUS_AED` (50) to both this user and their referrer, once, when this user's first job reaches `COMPLETED` (`grantReferralBonusIfDue` in `server/index.js`). A carrier's balance is spent automatically against their own platform fee at their next award; a shipper's balance accrues visibly (see `GET /api/auth/me` → `referral_credit_aed`, shown on the Profile page) but this app has no separate shipper-side fee to redeem it against yet. |
+| `referral_bonus_granted` | INTEGER | 0/1 (migration-added) — guards against re-crediting the same referrer/referred pair on a second completed job. |
 | `created_at` | TEXT | `datetime('now')` |
 
 ### `profiles`
@@ -103,6 +105,7 @@ The core entity.
 | `container_count` | INTEGER | default 1 (migration-added) — "no. of containers" for a volume inquiry |
 | `truck_count` | INTEGER | default 1 (migration-added) — "no. of trucks" for a volume inquiry |
 | `equipment_type` | TEXT | default `CONTAINER_CHASSIS` (migration-added) — one of `CONTAINER_CHASSIS`, `REEFER_TRUCK`, `LOWBED_TRAILER`, `FLATBED_TRAILER`, `BOX_TRUCK`, `CURTAIN_TRUCK`, `PICKUP_3T`, `PICKUP_5T`, `PICKUP_7T`, `PICKUP_10T`, `SIDE_LOADER_TRAILER`, `TRIPPER`. `container_size`/`container_type` only apply when this is `CONTAINER_CHASSIS` or `REEFER_TRUCK` — otherwise the server sets them to `'N/A'`/`'GENERAL'` and the cargo is described in `notes` instead. |
+| `cargo_type` | TEXT | default `GENERAL_CARGO` (migration-added) — what's actually inside, independent of `equipment_type`: one of `GENERAL_CARGO`, `PALLETIZED_BOXED`, `CONSTRUCTION_MATERIALS`, `MACHINERY_EQUIPMENT`, `VEHICLES`, `DRY_BULK`, `LIQUID_BULK`, `LIVESTOCK`, `PERISHABLE_FOOD`, `HAZARDOUS_MATERIALS`, `DOCUMENTS_PARCELS`, `OTHER`. Set at posting, editable while `OPEN` via `PATCH /api/jobs/:id`. |
 | `created_at` / `updated_at` | TEXT | |
 
 ### `bids`
@@ -174,12 +177,19 @@ Recurring lanes for shippers (retention).
 | `pickup_terminal` / `delivery_area` / `delivery_address` | TEXT NOT NULL | |
 | `container_size` | TEXT NOT NULL | |
 | `container_type` | TEXT | default `DRY` |
+| `cargo_type` | TEXT | default `GENERAL_CARGO` (migration-added) — same enum as `jobs.cargo_type`; carried into the job created by `POST /api/templates/:id/rerun`. |
 | `cadence` | TEXT | `ONCE`\|`WEEKLY`\|`BIWEEKLY`\|`MONTHLY` |
 | `notes` | TEXT | |
 | `created_at` | TEXT | |
 
 ### `contract_lanes`
-Committed monthly volume (G6).
+Committed monthly volume (G6). A job posted with a valid, active lane's id
+(`jobs.contract_lane_id` — re-validated server-side against `shipper_id` and
+`status='ACTIVE'` at `POST /api/jobs`, never trusted from the client as-is)
+gets two concrete benefits, not just a stored label: it sorts ahead of spot
+jobs in a carrier's open-loads view, and its award gets a 100bps commission
+discount (`CONTRACT_LANE_DISCOUNT_BPS` in `server/index.js`) off whatever
+`commission_rate_bps` currently is.
 
 | Column | Type | Notes |
 |---|---|---|

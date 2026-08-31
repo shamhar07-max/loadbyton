@@ -49,13 +49,24 @@ function currentCode(base32Secret, step = 30, at = Date.now()) {
   return hotp(base32Decode(base32Secret), counter);
 }
 
+// Same pattern as index.js's timingSafeEqualStr — hash both sides to a
+// fixed-length digest first so crypto.timingSafeEqual never has to see two
+// different-length inputs, then compare in constant time. The rest of the
+// codebase already uses this for every other secret comparison (session
+// tokens, the internal API key); this one had been missed.
+function timingSafeEqualStr(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
 // Accepts the current window and one step of drift on either side.
 function verifyCode(base32Secret, code, step = 30, at = Date.now()) {
   if (!code || !/^\d{6}$/.test(String(code))) return false;
   const counter = Math.floor(at / 1000 / step);
   const secretBuf = base32Decode(base32Secret);
   for (let drift = -1; drift <= 1; drift++) {
-    if (hotp(secretBuf, counter + drift) === String(code)) return true;
+    if (timingSafeEqualStr(hotp(secretBuf, counter + drift), code)) return true;
   }
   return false;
 }

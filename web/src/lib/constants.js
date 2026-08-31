@@ -42,6 +42,32 @@ export function equipmentLabel(value) {
   return EQUIPMENT_TYPE_LABELS[value] || formatLabel(value);
 }
 
+// What's actually inside the truck/container, independent of the equipment
+// carrying it (EQUIPMENT_TYPES above) — mirrors server/index.js CARGO_TYPES;
+// keep both lists in sync.
+export const CARGO_TYPES = [
+  'GENERAL_CARGO', 'PALLETIZED_BOXED', 'CONSTRUCTION_MATERIALS', 'MACHINERY_EQUIPMENT',
+  'VEHICLES', 'DRY_BULK', 'LIQUID_BULK', 'LIVESTOCK', 'PERISHABLE_FOOD',
+  'HAZARDOUS_MATERIALS', 'DOCUMENTS_PARCELS', 'OTHER',
+];
+export const CARGO_TYPE_LABELS = {
+  GENERAL_CARGO: 'General cargo',
+  PALLETIZED_BOXED: 'Palletised / boxed goods',
+  CONSTRUCTION_MATERIALS: 'Construction materials',
+  MACHINERY_EQUIPMENT: 'Machinery / equipment',
+  VEHICLES: 'Vehicles',
+  DRY_BULK: 'Dry bulk (grain, sand, aggregate)',
+  LIQUID_BULK: 'Liquid bulk',
+  LIVESTOCK: 'Livestock',
+  PERISHABLE_FOOD: 'Perishable / food',
+  HAZARDOUS_MATERIALS: 'Hazardous materials',
+  DOCUMENTS_PARCELS: 'Documents / parcels',
+  OTHER: 'Other',
+};
+export function cargoTypeLabel(value) {
+  return CARGO_TYPE_LABELS[value] || formatLabel(value);
+}
+
 export function formatLabel(value) {
   return value ? value.replaceAll('_', ' ') : '';
 }

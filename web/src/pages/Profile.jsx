@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
 import { api } from '../lib/api.js';
 import { usePageTitle } from '../lib/seo.jsx';
+import { formatAED } from '../lib/constants.js';
 import { Button, Card, Input, Label, Select, Badge, EmptyState } from '../components/ui.jsx';
 import { IconUser } from '../components/icons.jsx';
 import ScanWithAi from '../components/ScanWithAi.jsx';
@@ -133,6 +134,9 @@ export default function Profile() {
   const [saveError, setSaveError] = useState('');
   const [mfa, setMfa] = useState(null);
   const [mfaBusy, setMfaBusy] = useState(false);
+  const [disableStep, setDisableStep] = useState(false);
+  const [disableCode, setDisableCode] = useState('');
+  const [disableError, setDisableError] = useState('');
 
   async function save(e) {
     e.preventDefault();
@@ -161,12 +165,18 @@ export default function Profile() {
     }
   }
 
-  async function disableMfa() {
+  async function disableMfa(e) {
+    e.preventDefault();
     setMfaBusy(true);
+    setDisableError('');
     try {
-      await api.mfaDisable();
+      await api.mfaDisable(disableCode);
       setMfa(null);
+      setDisableStep(false);
+      setDisableCode('');
       await refresh();
+    } catch (err) {
+      setDisableError(err.message);
     } finally {
       setMfaBusy(false);
     }
@@ -245,10 +255,33 @@ export default function Profile() {
         <Card.Header><Card.Title>Two-factor authentication</Card.Title></Card.Header>
         <Card.Content>
           {user.mfa_enabled ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-ink-secondary">MFA is enabled on your account.</p>
-              <Button variant="danger" onClick={disableMfa} loading={mfaBusy} className="self-start shrink-0">Disable</Button>
-            </div>
+            disableStep ? (
+              <form onSubmit={disableMfa} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex-1">
+                  <Label>Enter your current 2FA code to confirm</Label>
+                  <Input
+                    required
+                    autoFocus
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={disableCode}
+                    onChange={(e) => setDisableCode(e.target.value)}
+                  />
+                  {disableError && <p className="mt-1 text-sm text-status-danger">{disableError}</p>}
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="ghost" onClick={() => { setDisableStep(false); setDisableCode(''); setDisableError(''); }}>Cancel</Button>
+                  <Button type="submit" variant="danger" loading={mfaBusy}>Confirm disable</Button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-ink-secondary">MFA is enabled on your account.</p>
+                <Button variant="danger" onClick={() => setDisableStep(true)} className="self-start shrink-0">Disable</Button>
+              </div>
+            )
           ) : mfa ? (
             <div className="space-y-2 text-sm">
               <p className="text-ink-secondary">Add this secret to your authenticator app:</p>
@@ -263,6 +296,25 @@ export default function Profile() {
           )}
         </Card.Content>
       </Card>
+
+      {user.role !== 'ADMIN' && (
+        <Card className="mt-6">
+          <Card.Header><Card.Title>Referrals</Card.Title></Card.Header>
+          <Card.Content className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-ink-secondary">Your referral code</p>
+              <p className="mt-0.5 font-mono text-sm font-semibold text-ink">{user.referral_code}</p>
+            </div>
+            <div className="sm:text-right">
+              <p className="text-sm text-ink-secondary">Credit balance</p>
+              <p className="mt-0.5 text-lg font-semibold text-ink">{formatAED(user.referral_credit_aed)}</p>
+              <p className="text-xs text-ink-muted">
+                {user.role === 'CARRIER' ? 'Applied automatically to your platform fee at your next award.' : 'Credited once someone you referred completes a job.'}
+              </p>
+            </div>
+          </Card.Content>
+        </Card>
+      )}
 
       {isOrgRoot && user.role !== 'ADMIN' && <TeamSection />}
 

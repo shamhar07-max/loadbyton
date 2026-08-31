@@ -359,6 +359,27 @@ addColumn('jobs', 'delivery_lat', 'delivery_lat REAL');
 addColumn('jobs', 'delivery_lng', 'delivery_lng REAL');
 addColumn('jobs', 'delivery_address_detail', 'delivery_address_detail TEXT');
 
+// What's actually inside the truck/container, independent of the equipment
+// carrying it (equipment_type) — a FLATBED_TRAILER can carry GENERAL_CARGO
+// or MACHINERY_EQUIPMENT, and a carrier scanning open loads needs to know
+// which before bidding. Mirrors container_size/container_type: threaded
+// through createJobFromBody, CSV import, and templates (see
+// server/index.js CARGO_TYPES and web/src/lib/constants.js).
+addColumn('jobs', 'cargo_type', "cargo_type TEXT NOT NULL DEFAULT 'GENERAL_CARGO'");
+addColumn('templates', 'cargo_type', "cargo_type TEXT NOT NULL DEFAULT 'GENERAL_CARGO'");
+
+// Referral credit ledger — STRATEGY.md promises "credit both sides"; until
+// now GET /api/admin/referrals derived a display-only 'CREDITED' status with
+// no ledger behind it (a real instance of the "control looks real but never
+// does anything" bug class TODOS.md's 2026-08-13 correction exists to catch).
+// referral_credit_aed is an actual balance, granted once per referred user's
+// first COMPLETED job (both referrer and referred get REFERRAL_BONUS_AED —
+// see server/index.js) and consumed against a carrier's own platform fee at
+// award time. referral_bonus_granted prevents double-crediting on a second
+// completed job by the same referred user.
+addColumn('users', 'referral_credit_aed', 'referral_credit_aed REAL NOT NULL DEFAULT 0');
+addColumn('users', 'referral_bonus_granted', 'referral_bonus_granted INTEGER NOT NULL DEFAULT 0');
+
 // ---------------------------------------------------------------------------
 // audit_log is append-only: DB triggers hard-abort UPDATE/DELETE. This makes
 // the audit trail tamper-evident even against a compromised app process.

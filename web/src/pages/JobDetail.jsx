@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { usePageTitle } from '../lib/seo.jsx';
-import { STATUS_FLOW, formatAED, formatDate, formatDateTime, formatLabel, EQUIPMENT_TYPES, CONTAINER_EQUIPMENT, equipmentLabel, TERMINALS, AREAS } from '../lib/constants.js';
+import { STATUS_FLOW, formatAED, formatDate, formatDateTime, formatLabel, EQUIPMENT_TYPES, CONTAINER_EQUIPMENT, equipmentLabel, CARGO_TYPES, cargoTypeLabel, TERMINALS, AREAS } from '../lib/constants.js';
 import { Button, Card, Input, Label, Select, Textarea, Badge, StatusBadge, EscrowBadge, Spinner, RatingPill } from '../components/ui.jsx';
 import { IconCheck, IconClock, IconMapPin, IconFile, IconMessage, IconStar, IconAlert, IconArrowLeft } from '../components/icons.jsx';
 import { useToasts } from '../components/Toast.jsx';
@@ -149,6 +149,8 @@ export default function JobDetail() {
             <StatusBadge status={job.status} />
             <EscrowBadge status={job.escrow_status} />
             <Badge color="neutral">{equipmentLabel(job.equipment_type)}</Badge>
+            <Badge color="neutral">{cargoTypeLabel(job.cargo_type)}</Badge>
+            {!!job.contract_lane_id && <Badge color="accent">Contract lane</Badge>}
             {!!job.requires_hazmat && <Badge color="warning">Hazmat</Badge>}
             {!!job.requires_reefer && <Badge color="info">Reefer</Badge>}
             {job.container_count > 1 && <Badge color="accent">×{job.container_count} containers</Badge>}
@@ -180,6 +182,7 @@ export default function JobDetail() {
             ) : (
               <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
                 <div><dt className="text-ink-muted">Equipment</dt><dd className="mt-0.5 font-medium text-ink">{equipmentLabel(job.equipment_type)}</dd></div>
+                <div><dt className="text-ink-muted">Cargo type</dt><dd className="mt-0.5 font-medium text-ink">{cargoTypeLabel(job.cargo_type)}</dd></div>
                 {CONTAINER_EQUIPMENT.includes(job.equipment_type) && (
                   <div><dt className="text-ink-muted">Container #</dt><dd className="mt-0.5 font-medium text-ink">{job.container_number || '—'}</dd></div>
                 )}
@@ -401,6 +404,7 @@ function JobEditForm({ job, onDone, onCancel }) {
     deliveryArea: job.delivery_area,
     deliveryAddress: job.delivery_address,
     containerNumber: job.container_number || '',
+    cargoType: job.cargo_type || 'GENERAL_CARGO',
     readyAt: toDatetimeLocal(job.ready_at),
     deadline: toDatetimeLocal(job.deadline),
     maxBudgetAed: job.max_budget_aed ?? '',
@@ -474,6 +478,12 @@ function JobEditForm({ job, onDone, onCancel }) {
           <Input value={form.containerNumber} onChange={(e) => setForm({ ...form, containerNumber: e.target.value })} />
         </div>
       )}
+      <div>
+        <Label>Cargo type</Label>
+        <Select value={form.cargoType} onChange={(e) => setForm({ ...form, cargoType: e.target.value })}>
+          {CARGO_TYPES.map((t) => <option key={t} value={t}>{cargoTypeLabel(t)}</option>)}
+        </Select>
+      </div>
       <div>
         <Label>Ready at</Label>
         <Input type="datetime-local" required value={form.readyAt} onChange={(e) => setForm({ ...form, readyAt: e.target.value })} />
@@ -801,11 +811,14 @@ function RateTool({ jobId }) {
   const [urgency, setUrgency] = useState('standard');
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  const { addToast } = useToasts();
   async function run() {
     setBusy(true);
     try {
       const r = await api.rateEstimate(jobId, { weightTons: weightTons ? Number(weightTons) : undefined, urgency });
       setResult(r);
+    } catch (err) {
+      addToast({ type: 'system_message', title: 'Could not estimate rate', body: err.message });
     } finally {
       setBusy(false);
     }
