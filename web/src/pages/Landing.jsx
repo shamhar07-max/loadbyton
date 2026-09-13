@@ -5,7 +5,7 @@ import { EQUIPMENT_TYPES, equipmentLabel } from '../lib/constants.js';
 import { usePageTitle } from '../lib/seo.jsx';
 import { useLocale } from '../lib/i18n.jsx';
 import { Reveal } from '../components/Reveal.jsx';
-import FreightMotionScene from '../components/FreightMotionScene.jsx';
+import HeroOperationsScene from '../components/HeroOperationsScene.jsx';
 import { IconShield, IconClock, IconArrowRight, IconStar, IconTruck, IconPackage, IconTrailer, IconLayers, IconCompass } from '../components/icons.jsx';
 
 const EQUIPMENT_ICONS = {
@@ -46,9 +46,11 @@ export default function Landing() {
 
   return (
     <div>
-      {/* Hero — split, not centered. Left: thesis. Right: an animated motion
-          scene (FreightMotionScene) — a truck driving a dusk highway with
-          the job lifecycle cycling above it — not a stock photo. */}
+      {/* Hero — split, not centered. Left: thesis. Right: an animated
+          operations diagram (HeroOperationsScene) — a load posted, matched
+          against candidate carriers, agreed, moved and delivered, with the
+          transaction settling at the end — not a stock photo, and not just
+          a truck driving past. */}
       <section className="border-b" style={{ borderColor: 'var(--border-default)' }}>
         <div className="container-page grid gap-12 py-16 lg:grid-cols-[1.05fr,0.95fr] lg:py-24">
           <div className="flex flex-col justify-center">
@@ -86,7 +88,7 @@ export default function Landing() {
                 <span className="badge" style={{ background: 'rgba(242,96,12,0.2)', color: 'var(--lb-orange-500)' }}>Escrow-backed</span>
               </div>
 
-              <FreightMotionScene />
+              <HeroOperationsScene />
 
               <div className="grid grid-cols-3 gap-px px-5 py-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
                 {[

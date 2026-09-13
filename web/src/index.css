@@ -291,72 +291,162 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
   animation-play-state: paused;
 }
 
-/* Hero visual (components/FreightMotionScene.jsx) — a looping motion-graphic
-   of a truck driving a dusk highway, with a status chip cycling through a
-   job's real lifecycle. Deliberately more vivid than the rest of the page
-   (dusk gradient, glow, warmer color use) — contained entirely inside its
-   own dark card so it reads as one intentional vivid moment, not a break
-   from the page's restraint elsewhere. All keyframe-driven, so the global
-   prefers-reduced-motion block above collapses every one of these to a
-   single static frame for free. */
-.freight-scene { position: relative; width: 100%; }
-.freight-scene-svg { display: block; width: 100%; height: auto; }
+/* Hero visual (components/HeroOperationsScene.jsx) — a looping diagram of a
+   shipment's commercial lifecycle: load posted -> matched against candidate
+   carriers -> agreed -> moved -> delivered -> settled. The truck is one
+   participant on the route, not the subject — the network/route/labels
+   together are what carry the story. One shared --hs-cycle duration (set
+   inline from the component's CYCLE_SECONDS) drives every keyframe below.
+   All keyframe-driven, so the global prefers-reduced-motion block above
+   still applies everywhere else; this component additionally defines its
+   own reduced-motion freeze frame further down, because "collapse every
+   animation to ~0 duration" isn't a coherent state for a multi-stage story —
+   the section below picks a single deliberate completed frame instead.
 
-.freight-scene-skyline {
-  animation: freight-skyline-drift 42s linear infinite;
+   Hero scene timeline — the single source of truth every keyframe and every
+   .hs-chip-N below is hand-timed against (percentages of --hs-cycle):
+     0-5%     idle (nothing active, calm establishing beat)
+     5-15%    load posted — origin lights up, load token appears
+     15-27%   matching — 3 candidate carriers appear, connections pulse
+     27-33%   quote received / selection resolves — 2 dim, 1 solidifies
+     33-37%   agreed — vehicle appears at origin
+     37-58%   in transit — route draws, vehicle travels, wheels turn
+     58-68%   approaching destination — still travelling, final stretch
+     68-80%   delivered — vehicle parked, destination lit, checkmark shown
+     80-98%   settled — checkmark/route/vehicle hold, "Settled" caption
+     98-100%  fade to invisible, then reset (route/vehicle repositioned
+              only while already fully transparent, so the loop never
+              visibly rewinds)
+   Changing a phase boundary means updating it in every rule below that
+   references it — there's no single variable it derives from (CSS
+   @keyframes percentages can't be computed), so this table is what keeps
+   them honest. */
+.hero-scene { position: relative; width: 100%; }
+.hero-scene-svg { display: block; width: 100%; height: auto; }
+
+.hero-scene-svg .hs-node-ring { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.5; }
+.hero-scene-svg .hs-node-dot { fill: var(--lb-orange-500); }
+
+.hero-scene-svg .hs-carrier { fill: rgba(255, 255, 255, 0.55); }
+.hero-scene-svg .hs-carrier-select { fill: var(--lb-orange-500); }
+.hero-scene-svg .hs-junction { fill: rgba(255, 255, 255, 0.6); }
+.hero-scene-svg .hs-line-reject,
+.hero-scene-svg .hs-line-select { stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.hero-scene-svg .hs-line-select { stroke: var(--lb-orange-500); stroke-dasharray: none; stroke-width: 2; }
+
+.hero-scene-svg .hs-load-icon rect { fill: var(--lb-orange-500); }
+
+.hero-scene-svg .hs-route { fill: none; stroke: var(--lb-orange-500); stroke-width: 2.5; stroke-linecap: round; }
+
+.hero-scene-svg .hs-vehicle-body { fill: #F1F5F9; }
+.hero-scene-svg .hs-vehicle-cab { fill: var(--lb-ink-800); }
+.hero-scene-svg .hs-wheel { fill: var(--lb-ink-600); }
+
+.hero-scene-svg .hs-checkmark-badge { fill: var(--lb-orange-500); }
+.hero-scene-svg .hs-checkmark-mark { fill: none; stroke: var(--lb-ink-950); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Origin lights up at 5% and holds through settlement; destination stays
+   dim until delivery at 68%. */
+.hs-origin { animation: hs-origin-pulse var(--hs-cycle) ease-in-out infinite; }
+@keyframes hs-origin-pulse {
+  0% { opacity: 0.3; }
+  5%, 93% { opacity: 1; }
+  100% { opacity: 0.3; }
 }
-@keyframes freight-skyline-drift {
-  to { transform: translateX(-152px); }
+.hs-destination { animation: hs-destination-pulse var(--hs-cycle) ease-in-out infinite; }
+@keyframes hs-destination-pulse {
+  0%, 65% { opacity: 0.3; }
+  70%, 93% { opacity: 1; }
+  100% { opacity: 0.3; }
 }
 
-.freight-scene-lanes {
-  animation: freight-lane-scroll 0.7s linear infinite;
-}
-@keyframes freight-lane-scroll {
-  to { stroke-dashoffset: -36; }
-}
-
-.freight-scene-glow {
-  animation: freight-glow-pulse 2.2s ease-in-out infinite;
-}
-@keyframes freight-glow-pulse {
-  0%, 100% { opacity: 0.65; }
-  50% { opacity: 1; }
+/* Load token appears at origin once posted, and disappears once the vehicle
+   departs with it — it doesn't need to visually travel, the vehicle does. */
+.hs-load-icon { animation: hs-load-appear var(--hs-cycle) ease-in-out infinite; }
+@keyframes hs-load-appear {
+  0%, 4% { opacity: 0; }
+  7%, 32% { opacity: 1; }
+  36%, 100% { opacity: 0; }
 }
 
-.freight-scene-truck {
+/* Matching cluster: all three candidates appear together (15-27%), then two
+   are dimmed (rejected) while one solidifies (selected, 27-33%) — then the
+   whole cluster recedes once the shipment is underway (37%+). */
+.hs-network { animation: hs-network-visible var(--hs-cycle) ease-in-out infinite; }
+@keyframes hs-network-visible {
+  0%, 13% { opacity: 0; }
+  16%, 32% { opacity: 1; }
+  37%, 100% { opacity: 0.1; }
+}
+.hs-carrier-reject, .hs-line-reject { animation: hs-reject var(--hs-cycle) ease-in-out infinite; }
+@keyframes hs-reject {
+  0%, 13% { opacity: 0; }
+  16%, 23% { opacity: 1; }
+  27%, 100% { opacity: 0.2; }
+}
+.hs-carrier-select, .hs-line-select, .hs-junction { animation: hs-select var(--hs-cycle) ease-in-out infinite; }
+@keyframes hs-select {
+  0%, 13% { opacity: 0; }
+  16%, 23% { opacity: 0.7; }
+  27%, 93% { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+
+/* Route — hidden pre-departure, drawn (stroke-dashoffset) across transit
+   (37-68%), held complete through delivery/settlement, then un-drawn only
+   while its own opacity has already reached 0 — so the loop never visibly
+   rewinds. */
+.hs-route {
+  animation: hs-route-opacity var(--hs-cycle) linear infinite, hs-route-draw var(--hs-cycle) linear infinite;
+}
+@keyframes hs-route-opacity {
+  0%, 36% { opacity: 0; }
+  38%, 93% { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+@keyframes hs-route-draw {
+  0%, 37% { stroke-dashoffset: 320; }
+  68%, 97% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 320; }
+}
+
+/* Vehicle — hidden until the agreement completes, travels the route during
+   transit, holds at the destination through settlement, fades out (already
+   parked) rather than driving back offscreen. Wheels only turn while it's
+   actually moving, not while parked. */
+.hs-vehicle {
   transform-box: view-box;
-  animation: freight-truck-bounce 1.1s ease-in-out infinite;
+  animation: hs-vehicle-move var(--hs-cycle) ease-in-out infinite;
 }
-@keyframes freight-truck-bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-1.5px); }
+@keyframes hs-vehicle-move {
+  0%, 34% { opacity: 0; transform: translate(40px, 150px); }
+  37% { opacity: 1; transform: translate(40px, 150px); }
+  68% { opacity: 1; transform: translate(360px, 150px); }
+  93% { opacity: 1; transform: translate(360px, 150px); }
+  98%, 100% { opacity: 0; transform: translate(360px, 150px); }
 }
-
-.freight-scene-wheel {
-  animation: freight-wheel-spin 0.9s linear infinite;
-}
-@keyframes freight-wheel-spin {
-  to { transform: rotate(360deg); }
-}
-
-.freight-scene-headlight {
-  filter: drop-shadow(0 0 3px rgba(255, 232, 194, 0.9));
-  animation: freight-headlight-pulse 1.6s ease-in-out infinite;
-}
-@keyframes freight-headlight-pulse {
-  0%, 100% { opacity: 0.75; }
-  50% { opacity: 1; }
+.hs-wheel { animation: hs-wheel-spin var(--hs-cycle) linear infinite; }
+@keyframes hs-wheel-spin {
+  0%, 37% { transform: rotate(0deg); }
+  68%, 100% { transform: rotate(1080deg); }
 }
 
-.freight-scene-chips {
+/* Delivery confirmation, right after the vehicle arrives at 68%. */
+.hs-checkmark { animation: hs-checkmark-appear var(--hs-cycle) ease-in-out infinite; transform-origin: center; }
+@keyframes hs-checkmark-appear {
+  0%, 67% { opacity: 0; transform: scale(0.4); }
+  72%, 91% { opacity: 1; transform: scale(1); }
+  97%, 100% { opacity: 0; transform: scale(0.4); }
+}
+
+.hero-scene-chips {
   position: absolute;
-  top: 26%;
+  top: 10%;
   left: 0;
   width: 100%;
   pointer-events: none;
 }
-.freight-scene-chip {
+.hero-scene-chip {
   position: absolute;
   top: 0;
   left: 50%;
@@ -371,13 +461,102 @@ html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3, html[lang="ar"] h4, 
   color: #ffffff;
   font-size: 12px;
   font-weight: 600;
-  animation-name: freight-chip-cycle;
+  opacity: 0;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
+  animation-duration: var(--hs-cycle);
 }
-@keyframes freight-chip-cycle {
-  0%, 3%, 25%, 100% { opacity: 0; transform: translate(-50%, 6px); }
-  8%, 20% { opacity: 1; transform: translate(-50%, 0); }
+/* One keyframe per caption, each hand-timed to its own row in the timeline
+   table above (not evenly spaced) — see the CYCLE_SECONDS comment in
+   HeroOperationsScene.jsx for why a shared/delay-offset keyframe was
+   rejected. */
+.hs-chip-1 { animation-name: hs-chip-1; } /* Load posted: 5-15% */
+@keyframes hs-chip-1 {
+  0%, 4% { opacity: 0; transform: translate(-50%, 6px); }
+  6%, 13% { opacity: 1; transform: translate(-50%, 0); }
+  16%, 100% { opacity: 0; transform: translate(-50%, 6px); }
+}
+.hs-chip-2 { animation-name: hs-chip-2; } /* Matching carriers: 15-27% */
+@keyframes hs-chip-2 {
+  0%, 14% { opacity: 0; transform: translate(-50%, 6px); }
+  16%, 26% { opacity: 1; transform: translate(-50%, 0); }
+  28%, 100% { opacity: 0; transform: translate(-50%, 6px); }
+}
+.hs-chip-3 { animation-name: hs-chip-3; } /* Quote received: 27-33% */
+@keyframes hs-chip-3 {
+  0%, 26% { opacity: 0; transform: translate(-50%, 6px); }
+  28%, 32% { opacity: 1; transform: translate(-50%, 0); }
+  34%, 100% { opacity: 0; transform: translate(-50%, 6px); }
+}
+.hs-chip-4 { animation-name: hs-chip-4; } /* Agreed: 33-37% */
+@keyframes hs-chip-4 {
+  0%, 32% { opacity: 0; transform: translate(-50%, 6px); }
+  34%, 36% { opacity: 1; transform: translate(-50%, 0); }
+  38%, 100% { opacity: 0; transform: translate(-50%, 6px); }
+}
+.hs-chip-5 { animation-name: hs-chip-5; } /* In transit: 37-58% */
+@keyframes hs-chip-5 {
+  0%, 36% { opacity: 0; transform: translate(-50%, 6px); }
+  38%, 56% { opacity: 1; transform: translate(-50%, 0); }
+  60%, 100% { opacity: 0; transform: translate(-50%, 6px); }
+}
+.hs-chip-6 { animation-name: hs-chip-6; } /* Approaching destination: 58-68% */
+@keyframes hs-chip-6 {
+  0%, 58% { opacity: 0; transform: translate(-50%, 6px); }
+  60%, 66% { opacity: 1; transform: translate(-50%, 0); }
+  68%, 100% { opacity: 0; transform: translate(-50%, 6px); }
+}
+.hs-chip-7 { animation-name: hs-chip-7; } /* Delivered: 68-80% */
+@keyframes hs-chip-7 {
+  0%, 66% { opacity: 0; transform: translate(-50%, 6px); }
+  69%, 78% { opacity: 1; transform: translate(-50%, 0); }
+  81%, 100% { opacity: 0; transform: translate(-50%, 6px); }
+}
+.hs-chip-8 { animation-name: hs-chip-8; } /* Settled: 80-98% */
+@keyframes hs-chip-8 {
+  0%, 79% { opacity: 0; transform: translate(-50%, 6px); }
+  82%, 95% { opacity: 1; transform: translate(-50%, 0); }
+  98%, 100% { opacity: 0; transform: translate(-50%, 6px); }
+}
+
+/* Reduced motion: freeze on the completed transaction rather than fast-
+   forwarding through it — origin lit, route fully drawn, vehicle parked at
+   the destination, delivery confirmed, matching sub-plot hidden. That one
+   frame still communicates "a shipment moved and the transaction closed"
+   without any motion at all. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-scene-svg .hs-origin,
+  .hero-scene-svg .hs-destination,
+  .hero-scene-svg .hs-route,
+  .hero-scene-svg .hs-vehicle,
+  .hero-scene-svg .hs-checkmark,
+  .hero-scene-svg .hs-load-icon,
+  .hero-scene-svg .hs-network,
+  .hero-scene-svg .hs-carrier-reject,
+  .hero-scene-svg .hs-carrier-select,
+  .hero-scene-svg .hs-line-reject,
+  .hero-scene-svg .hs-line-select,
+  .hero-scene-svg .hs-junction,
+  .hero-scene-svg .hs-wheel,
+  .hero-scene-chip {
+    animation: none !important;
+  }
+  .hero-scene-svg .hs-origin,
+  .hero-scene-svg .hs-destination,
+  .hero-scene-svg .hs-route,
+  .hero-scene-svg .hs-vehicle,
+  .hero-scene-svg .hs-checkmark {
+    opacity: 1 !important;
+  }
+  .hero-scene-svg .hs-route { stroke-dashoffset: 0 !important; }
+  .hero-scene-svg .hs-vehicle { transform: translate(360px, 150px) !important; }
+  .hero-scene-svg .hs-checkmark { transform: scale(1) !important; }
+  .hero-scene-svg .hs-network,
+  .hero-scene-svg .hs-load-icon {
+    opacity: 0 !important;
+  }
+  .hero-scene-chip { opacity: 0 !important; }
+  .hs-chip-8 { opacity: 1 !important; transform: translate(-50%, 0) !important; }
 }
 
 /* ------------------------------------------------------------------ */
